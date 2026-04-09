@@ -1,0 +1,79 @@
+{
+  "id": "/",
+  "name": "Calorie Coach",
+  "short_name": "CalCoach",
+  "description": "AI-powered calorie tracking assistant",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f4f1",
+  "theme_color": "#ef4444",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tag billede",
+      "short_name": "Kamera",
+      "description": "Åbn kameraet og log mad",
+      "url": "/?action=camera",
+      "icons": [
+        {
+          "src": "/icons/shortcut-camera.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Dikter mad",
+      "short_name": "Diktering",
+      "description": "Start stemmeoptagelse",
+      "url": "/?action=voice",
+      "icons": [
+        {
+          "src": "/icons/shortcut-voice.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Log mad",
+      "short_name": "Log",
+      "description": "Skriv hvad du har spist",
+      "url": "/?action=log",
+      "icons": [
+        {
+          "src": "/icons/shortcut-log.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

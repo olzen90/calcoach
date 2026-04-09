@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom base styles */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    @apply bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 min-h-screen;
+    font-family: 'Nunito', system-ui, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Fredoka', 'Nunito', system-ui, sans-serif;
+  }
+}
+
+/* Custom component styles */
+@layer components {
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-500 to-accent-pink px-6 py-3 rounded-2xl text-white font-semibold
+           shadow-playful hover:shadow-playful-lg transform hover:scale-105 active:scale-95
+           transition-all duration-200 ease-out;
+  }
+  
+  .btn-secondary {
+    @apply bg-white px-6 py-3 rounded-2xl text-gray-700 font-semibold border-2 border-gray-200
+           shadow-playful hover:shadow-playful-lg hover:border-primary-300 transform hover:scale-105 active:scale-95
+           transition-all duration-200 ease-out;
+  }
+  
+  .card {
+    @apply bg-white rounded-3xl shadow-playful p-6;
+  }
+  
+  .card-gradient {
+    @apply rounded-3xl shadow-playful p-6 bg-gradient-to-br;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 rounded-2xl border-2 border-gray-200 
+           focus:border-primary-400 focus:ring-4 focus:ring-primary-100
+           outline-none transition-all duration-200;
+  }
+  
+  .nav-item {
+    @apply flex flex-col items-center justify-center py-2 px-4 rounded-2xl
+           text-gray-500 hover:text-primary-500 hover:bg-primary-50
+           transition-all duration-200;
+  }
+  
+  .nav-item.active {
+    @apply text-primary-500 bg-primary-50;
+  }
+  
+  /* Streak flame animation */
+  .flame-icon {
+    @apply animate-flame;
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+  
+  /* Progress ring */
+  .progress-ring {
+    transform: rotate(-90deg);
+  }
+  
+  .progress-ring circle {
+    transition: stroke-dashoffset 0.5s ease-out;
+  }
+  
+  /* Meal card */
+  .meal-card {
+    @apply bg-white rounded-2xl p-4 shadow-sm border border-gray-100
+           hover:shadow-playful transition-all duration-200;
+  }
+  
+  /* Macro badge - consistent colors across the app */
+  .macro-badge {
+    @apply px-3 py-1 rounded-full text-sm font-semibold;
+  }
+  
+  .macro-badge.protein {
+    @apply bg-blue-100 text-blue-600;
+  }
+  
+  .macro-badge.carbs {
+    @apply bg-amber-100 text-amber-600;
+  }
+  
+  .macro-badge.fat {
+    @apply bg-purple-100 text-purple-600;
+  }
+  
+  .macro-badge.sugar {
+    @apply bg-pink-100 text-pink-600;
+  }
+  
+  .macro-badge.fiber {
+    @apply bg-green-100 text-green-600;
+  }
+  
+  .macro-badge.sodium {
+    @apply bg-slate-100 text-slate-600;
+  }
+  
+  .macro-badge.calories {
+    @apply bg-gray-100 text-gray-700;
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r;
+  }
+  
+  .text-gradient-primary {
+    @apply text-gradient from-primary-500 to-accent-pink;
+  }
+  
+  .text-gradient-success {
+    @apply text-gradient from-green-500 to-teal-500;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Safe area padding for mobile */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+}
+
+/* Voice input recording animation */
+@keyframes recording-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(239, 68, 68, 0);
+  }
+}
+
+.recording {
+  animation: recording-pulse 1.5s infinite;
+}
+
+/* Celebration confetti */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100%) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.confetti {
+  animation: confetti-fall 3s ease-out forwards;
+}
+
+/* Select dropdown styling - outside @layer for proper specificity */
+select.input-field {
+  padding-right: 3.5rem !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 1.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25rem 1.25rem;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
