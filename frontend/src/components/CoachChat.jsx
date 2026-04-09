@@ -340,11 +340,11 @@ export default function CoachChat({ feed, meals, onRefresh }) {
         {/* Image or emoji */}
         {meal.image_path ? (
           <button
-            onClick={() => setFullscreenImage({ src: `/${meal.image_path}`, alt: meal.description })}
+            onClick={() => setFullscreenImage({ src: meal.image_path.startsWith('http') ? meal.image_path : `/${meal.image_path}`, alt: meal.description })}
             className="relative group flex-shrink-0"
           >
             <img
-              src={`/${meal.image_path}`}
+              src={meal.image_path.startsWith('http') ? meal.image_path : `/${meal.image_path}`}
               alt={meal.description}
               className="w-14 h-14 rounded-xl object-cover cursor-pointer transition-transform group-hover:scale-105"
             />

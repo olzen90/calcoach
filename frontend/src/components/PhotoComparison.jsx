@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { Camera, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
+const imgSrc = (path) => path?.startsWith('http') ? path : `/${path}`
+
 export default function PhotoComparison({ onUpload }) {
   const [photos, setPhotos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -80,13 +82,13 @@ export default function PhotoComparison({ onUpload }) {
               <div className="aspect-[3/4] rounded-xl overflow-hidden bg-gray-100">
                 {selectedLeft.front_image_path ? (
                   <img 
-                    src={`/${selectedLeft.front_image_path}`}
+                    src={imgSrc(selectedLeft.front_image_path)}
                     alt="Before"
                     className="w-full h-full object-cover"
                   />
                 ) : selectedLeft.side_image_path ? (
                   <img 
-                    src={`/${selectedLeft.side_image_path}`}
+                    src={imgSrc(selectedLeft.side_image_path)}
                     alt="Before"
                     className="w-full h-full object-cover"
                   />
@@ -106,13 +108,13 @@ export default function PhotoComparison({ onUpload }) {
               <div className="aspect-[3/4] rounded-xl overflow-hidden bg-gray-100">
                 {selectedRight.front_image_path ? (
                   <img 
-                    src={`/${selectedRight.front_image_path}`}
+                    src={imgSrc(selectedRight.front_image_path)}
                     alt="After"
                     className="w-full h-full object-cover"
                   />
                 ) : selectedRight.side_image_path ? (
                   <img 
-                    src={`/${selectedRight.side_image_path}`}
+                    src={imgSrc(selectedRight.side_image_path)}
                     alt="After"
                     className="w-full h-full object-cover"
                   />
@@ -155,7 +157,7 @@ export default function PhotoComparison({ onUpload }) {
               }`}
             >
               <img 
-                src={`/${photo.front_image_path || photo.side_image_path}`}
+                src={imgSrc(photo.front_image_path || photo.side_image_path)}
                 alt={format(new Date(photo.date), 'MMM d')}
                 className="w-full h-full object-cover"
               />
@@ -200,7 +202,7 @@ export default function PhotoComparison({ onUpload }) {
                 {format(new Date(selectedLeft.date), 'MMM d, yyyy')}
               </p>
               <img 
-                src={`/${selectedLeft.front_image_path || selectedLeft.side_image_path}`}
+                src={imgSrc(selectedLeft.front_image_path || selectedLeft.side_image_path)}
                 alt="Before"
                 className="w-full h-full object-contain"
               />
@@ -210,7 +212,7 @@ export default function PhotoComparison({ onUpload }) {
                 {format(new Date(selectedRight.date), 'MMM d, yyyy')}
               </p>
               <img 
-                src={`/${selectedRight.front_image_path || selectedRight.side_image_path}`}
+                src={imgSrc(selectedRight.front_image_path || selectedRight.side_image_path)}
                 alt="After"
                 className="w-full h-full object-contain"
               />
