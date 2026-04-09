@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 
 export default function SettingsView() {
-  const { settings, loading, error, refresh } = useSettings()
+  const { settings, loading, error, refresh, setSettings } = useSettings()
   const { put, post, get, del } = useApi()
   
   const [activeSection, setActiveSection] = useState('profile')
@@ -75,17 +75,7 @@ export default function SettingsView() {
     const init = async () => {
       try {
         const data = await get('/settings/dashboard')
-        if (data.settings) {
-          // Manually set settings to avoid extra refresh() call
-          const s = data.settings
-          setProfile({ name: s.name || '', age: s.age || '', weight_kg: s.weight_kg || '', gender: s.gender || '' })
-          setGoals({
-            daily_calorie_goal: s.daily_calorie_goal || '', calorie_focus_mode: s.calorie_focus_mode || 'daily',
-            protein_goal_g: s.protein_goal_g || '', carbs_goal_g: s.carbs_goal_g || '', fat_goal_g: s.fat_goal_g || '',
-            sugar_goal_g: s.sugar_goal_g || 50, fiber_goal_g: s.fiber_goal_g || 30, sodium_goal_mg: s.sodium_goal_mg || 2300
-          })
-          setAiSettings({ base_prompt: s.base_prompt || '' })
-        }
+        if (data.settings) setSettings(data.settings)
         if (data.exercises) setExercises(data.exercises)
         if (data.storage) setStorage(data.storage)
         if (data.favorites) setFavorites(data.favorites)

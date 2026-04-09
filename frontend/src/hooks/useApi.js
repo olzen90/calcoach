@@ -110,7 +110,7 @@ export function useTodayMeals() {
     }
   }, [])
 
-  return { meals, loading, error, refresh }
+  return { meals, loading, error, refresh, setMeals }
 }
 
 /**

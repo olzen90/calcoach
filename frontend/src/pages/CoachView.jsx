@@ -12,7 +12,7 @@ import CameraCapture from '../components/CameraCapture'
 
 export default function CoachView() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { meals, loading, error, refresh } = useTodayMeals()
+  const { meals, loading, error, refresh, setMeals } = useTodayMeals()
   const { uploadFile, get, post, loading: submitting } = useApi()
   const [feed, setFeed] = useState(null)
   const [weeklyTrajectory, setWeeklyTrajectory] = useState(null)
@@ -58,16 +58,13 @@ export default function CoachView() {
     const init = async () => {
       try {
         const data = await get('/meals/coach-init')
-        if (data.today) {
-          // Update the meals hook state via refresh's setter pattern
-          // We call refresh() after to sync the useTodayMeals hook
-        }
+        if (data.today) setMeals(data.today)
         if (data.feed) setFeed(data.feed)
         if (data.weekly_trajectory) setWeeklyTrajectory(data.weekly_trajectory)
       } catch (err) {
         console.error('Failed to load coach data:', err)
+        refresh()
       }
-      refresh()
     }
     init()
   }, [])
