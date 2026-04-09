@@ -40,7 +40,6 @@ export default function SettingsView() {
   })
   
   const [aiSettings, setAiSettings] = useState({
-    openai_api_key: '',
     base_prompt: ''
   })
   
@@ -98,7 +97,6 @@ export default function SettingsView() {
         sodium_goal_mg: settings.sodium_goal_mg || 2300
       })
       setAiSettings({
-        openai_api_key: settings.openai_api_key || '',
         base_prompt: settings.base_prompt || ''
       })
     }
@@ -642,21 +640,7 @@ export default function SettingsView() {
         <div className="space-y-4">
           <div className="card space-y-4">
             <h2 className="text-lg font-semibold text-gray-800">AI Coach Settings</h2>
-            
-            <div>
-              <label className="block text-sm text-gray-500 mb-1">OpenAI API Key</label>
-              <input
-                type="password"
-                value={aiSettings.openai_api_key}
-                onChange={(e) => setAiSettings({...aiSettings, openai_api_key: e.target.value})}
-                className="input-field"
-                placeholder="sk-..."
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Required for AI food analysis. Get one at platform.openai.com
-              </p>
-            </div>
-            
+
             <div>
               <label className="block text-sm text-gray-500 mb-1">Base Prompt</label>
               <textarea

@@ -10,7 +10,7 @@ from database import (
     get_db, User, WeightLog, MeasurementLog, ProgressPhoto,
     ExerciseConfig, LiftLog
 )
-from services.image_service import save_image
+from services.image_service import save_image, delete_image
 
 router = APIRouter()
 
@@ -367,10 +367,9 @@ async def delete_progress_photo(photo_id: int, db: Session = Depends(get_db)):
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
     
-    # Delete image files
     for path in [photo.front_image_path, photo.side_image_path]:
-        if path and os.path.exists(path):
-            os.remove(path)
+        if path:
+            await delete_image(path)
     
     db.delete(photo)
     db.commit()

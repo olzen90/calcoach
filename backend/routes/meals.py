@@ -231,10 +231,10 @@ async def analyze_and_log_meal(
     local_time: User's local time in HH:MM format (from browser).
     """
     user = get_user(db)
-    
-    if not user.openai_api_key:
-        raise HTTPException(status_code=400, detail="OpenAI API key not configured")
-    
+
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=400, detail="OPENAI_API_KEY environment variable is not set")
+
     # Save image if provided
     image_path = None
     if image:
@@ -301,7 +301,6 @@ async def analyze_and_log_meal(
     # Analyze with AI
     try:
         analysis = await analyze_food(
-            api_key=user.openai_api_key,
             description=description,
             image_path=image_path,
             base_prompt=user.base_prompt,

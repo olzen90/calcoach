@@ -65,7 +65,6 @@ def get_food_emoji(food_name: str) -> str:
 
 
 async def analyze_food(
-    api_key: str,
     description: str,
     image_path: Optional[str] = None,
     base_prompt: Optional[str] = None,
@@ -90,6 +89,9 @@ async def analyze_food(
     - notes: str
     """
     
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable is not set")
     client = openai.OpenAI(api_key=api_key)
     
     # Core instructions (not editable by user - required for app to function)
@@ -271,21 +273,27 @@ Respond with valid JSON only, no other text."""
     user_content = []
     
     # Add image if provided
-    if image_path and os.path.exists(image_path):
-        with open(image_path, "rb") as f:
-            image_data = base64.b64encode(f.read()).decode("utf-8")
-        
-        # Determine media type from extension
-        ext = image_path.split(".")[-1].lower()
-        media_type = "image/webp" if ext == "webp" else f"image/{ext}"
-        
-        user_content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:{media_type};base64,{image_data}",
-                "detail": "high"
-            }
-        })
+    if image_path:
+        is_url = image_path.startswith("http://") or image_path.startswith("https://")
+        if is_url:
+            # Blob URL — pass directly to OpenAI (no base64 encoding needed)
+            user_content.append({
+                "type": "image_url",
+                "image_url": {"url": image_path, "detail": "high"}
+            })
+        elif os.path.exists(image_path):
+            # Local file — base64 encode
+            with open(image_path, "rb") as f:
+                image_data = base64.b64encode(f.read()).decode("utf-8")
+            ext = image_path.split(".")[-1].lower()
+            media_type = "image/webp" if ext == "webp" else f"image/{ext}"
+            user_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{media_type};base64,{image_data}",
+                    "detail": "high"
+                }
+            })
     
     # Add text description
     user_content.append({

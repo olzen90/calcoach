@@ -23,9 +23,10 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     
-    # Create uploads directory if it doesn't exist
-    os.makedirs("uploads/meals", exist_ok=True)
-    os.makedirs("uploads/progress", exist_ok=True)
+    # Only create local upload dirs when not running on Vercel
+    if not os.getenv("VERCEL"):
+        os.makedirs("uploads/meals", exist_ok=True)
+        os.makedirs("uploads/progress", exist_ok=True)
     
     yield
 
@@ -46,8 +47,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for uploaded images
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Mount static files for local dev only (Vercel uses Blob storage)
+if not os.getenv("VERCEL"):
+    try:
+        app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+    except RuntimeError:
+        pass  # uploads dir not yet created on first start
 
 # Include routers
 app.include_router(meals.router, prefix="/api/meals", tags=["Meals"])

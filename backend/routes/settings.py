@@ -4,9 +4,9 @@ from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel
 import os
-import shutil
 
 from database import get_db, User, MealEntry, ProgressPhoto
+from services.image_service import delete_image
 
 router = APIRouter()
 
@@ -30,7 +30,6 @@ class GoalSettings(BaseModel):
 
 
 class AISettings(BaseModel):
-    openai_api_key: Optional[str]
     base_prompt: Optional[str]
 
 
@@ -69,10 +68,9 @@ class FullSettings(BaseModel):
     sugar_goal_g: int = 50
     fiber_goal_g: int = 30
     sodium_goal_mg: int = 2300
-    openai_api_key: Optional[str]
     base_prompt: Optional[str]
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -92,31 +90,10 @@ def get_user(db: Session) -> User:
     return user
 
 
-def get_directory_size(path: str) -> float:
-    """Get total size of directory in MB."""
-    total = 0
-    if os.path.exists(path):
-        for dirpath, dirnames, filenames in os.walk(path):
-            for f in filenames:
-                fp = os.path.join(dirpath, f)
-                total += os.path.getsize(fp)
-    return round(total / (1024 * 1024), 2)
-
-
-def count_files(path: str) -> int:
-    """Count files in directory."""
-    count = 0
-    if os.path.exists(path):
-        for dirpath, dirnames, filenames in os.walk(path):
-            count += len(filenames)
-    return count
-
-
 @router.get("/", response_model=FullSettings)
 async def get_settings(db: Session = Depends(get_db)):
     """Get all user settings."""
     user = get_user(db)
-    # Mask API key for security
     user_dict = {
         "id": user.id,
         "name": user.name,
@@ -131,9 +108,8 @@ async def get_settings(db: Session = Depends(get_db)):
         "sugar_goal_g": user.sugar_goal_g or 50,
         "fiber_goal_g": user.fiber_goal_g or 30,
         "sodium_goal_mg": user.sodium_goal_mg or 2300,
-        "openai_api_key": "****" + user.openai_api_key[-4:] if user.openai_api_key else None,
         "base_prompt": user.base_prompt,
-        "created_at": user.created_at
+        "created_at": user.created_at,
     }
     return FullSettings(**user_dict)
 
@@ -182,20 +158,15 @@ async def update_goals(goals: GoalSettings, db: Session = Depends(get_db)):
 
 @router.put("/ai", response_model=FullSettings)
 async def update_ai_settings(settings: AISettings, db: Session = Depends(get_db)):
-    """Update AI/OpenAI settings."""
+    """Update AI coach settings."""
     user = get_user(db)
-    
-    if settings.openai_api_key is not None:
-        # Don't update if it's the masked version
-        if not settings.openai_api_key.startswith("****"):
-            user.openai_api_key = settings.openai_api_key
-    
+
     if settings.base_prompt is not None:
         user.base_prompt = settings.base_prompt
-    
+
     db.commit()
     db.refresh(user)
-    
+
     return await get_settings(db)
 
 
@@ -273,22 +244,22 @@ async def calculate_tdee(data: TDEECalculation):
 async def get_storage_info(db: Session = Depends(get_db)):
     """Get storage usage information."""
     user = get_user(db)
-    
-    meal_photos_path = "uploads/meals"
-    progress_photos_path = "uploads/progress"
-    
-    meal_count = count_files(meal_photos_path)
-    meal_size = get_directory_size(meal_photos_path)
-    
-    progress_count = count_files(progress_photos_path)
-    progress_size = get_directory_size(progress_photos_path)
-    
+
+    meal_count = db.query(MealEntry).filter(
+        MealEntry.user_id == user.id,
+        MealEntry.image_path.isnot(None)
+    ).count()
+
+    progress_count = db.query(ProgressPhoto).filter(
+        ProgressPhoto.user_id == user.id
+    ).count()
+
     return StorageInfo(
         meal_photos_count=meal_count,
-        meal_photos_size_mb=meal_size,
+        meal_photos_size_mb=0.0,
         progress_photos_count=progress_count,
-        progress_photos_size_mb=progress_size,
-        total_size_mb=round(meal_size + progress_size, 2)
+        progress_photos_size_mb=0.0,
+        total_size_mb=0.0,
     )
 
 
@@ -312,8 +283,8 @@ async def clear_meal_photos(
     
     deleted_count = 0
     for meal in meals:
-        if meal.image_path and os.path.exists(meal.image_path):
-            os.remove(meal.image_path)
+        if meal.image_path:
+            await delete_image(meal.image_path)
             deleted_count += 1
         meal.image_path = None
     
@@ -345,8 +316,8 @@ async def clear_progress_photos(
     deleted_count = 0
     for photo in photos:
         for path in [photo.front_image_path, photo.side_image_path]:
-            if path and os.path.exists(path):
-                os.remove(path)
+            if path:
+                await delete_image(path)
                 deleted_count += 1
         db.delete(photo)
     
