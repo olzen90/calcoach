@@ -2,7 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
 
 from database import init_db, get_db, create_default_user, SessionLocal, run_migrations
 from routes import meals, templates, progress, stats, settings
