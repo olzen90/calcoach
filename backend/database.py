@@ -4,8 +4,9 @@ from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime, date
 import os
 
-# Database setup
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./calorie_coach.db")
+# Database setup — on Vercel, SQLite must live in /tmp (the only writable dir)
+_default_db = "sqlite:////tmp/calorie_coach.db" if os.getenv("VERCEL") else "sqlite:///./calorie_coach.db"
+DATABASE_URL = os.getenv("DATABASE_URL", _default_db)
 
 # SQLite needs check_same_thread=False; Postgres/other DBs do not support it
 if DATABASE_URL.startswith("sqlite"):
