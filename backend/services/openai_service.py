@@ -105,7 +105,8 @@ FIRST, determine the type of entry. The user might be:
 3. Logging a LIFT/exercise they did (e.g., "squatted 100kg x 8", "bench press 60kg for 10 reps")
 4. Logging a body MEASUREMENT (e.g., "waist is 90cm", "measured 88cm waist")
 5. EDITING an existing meal from today (e.g., "actually that chicken was 400 calories", "the salmon had 50g protein", "change the pasta to 600 calories", "the first meal had more rice")
-6. Asking a QUESTION about nutrition, their logged meals, food in general, or asking for analysis (e.g., "where did my sugar come from?", "how many calories in a Big Mac?", "what should I eat to hit my protein goal?", "am I eating too much sodium?", "what foods are high in fiber?")
+6. DELETING a meal from today (e.g., "delete the vaffelrør", "remove the coffee", "slet morgenmaden", "I didn't actually eat the pasta", "fjern det sidste måltid")
+7. Asking a QUESTION about nutrition, their logged meals, food in general, or asking for analysis (e.g., "where did my sugar come from?", "how many calories in a Big Mac?", "what should I eat to hit my protein goal?", "am I eating too much sodium?", "what foods are high in fiber?")
 
 Always respond with a JSON object. The "entry_type" field determines the structure:
 
@@ -152,6 +153,13 @@ For EDIT entries (modifying an existing meal):
   },
   "breakdown": [{"item": string, "amount": string, "calories": number (integer), "protein_g": number (max 1 decimal), "carbs_g": number (max 1 decimal), "fat_g": number (max 1 decimal), "sugar_g": number (max 1 decimal), "fiber_g": number (max 1 decimal), "sodium_mg": number (integer)}] (REQUIRED - always provide the COMPLETE updated breakdown. If the meal has existing breakdown items (shown in CURRENT BREAKDOWN), start from those and update/add/remove items as needed to reflect the change. The breakdown items MUST sum to the updated totals. Always use grams for amounts.),
   "notes": string (explain what was changed and why)
+}
+
+For DELETE entries (removing one or more meals):
+{
+  "entry_type": "delete",
+  "meal_ids": [number] (list of IDs of the meals to delete from today's meals list - can be one or multiple),
+  "notes": string (confirm what was deleted, in the same language as the user's input)
 }
 
 For MERGE entries (combining two or more meals into one):
@@ -355,6 +363,12 @@ Respond with valid JSON only, no other text."""
                 "meal_id": safe_number(result.get("meal_id"), 0, as_int=True),
                 "updates": result.get("updates", {}),
                 "breakdown": result.get("breakdown", []),
+                "notes": result.get("notes", "")
+            }
+        elif entry_type == "delete":
+            return {
+                "entry_type": "delete",
+                "meal_ids": [int(i) for i in result.get("meal_ids", [])],
                 "notes": result.get("notes", "")
             }
         elif entry_type == "merge":

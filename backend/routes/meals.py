@@ -9,7 +9,7 @@ import json
 
 from database import get_db, MealEntry, User, DailyStats, MealTemplate, WeightLog, MeasurementLog, LiftLog, ExerciseConfig, ChatMessage, AutoLogHistory
 from services.openai_service import analyze_food
-from services.image_service import save_image
+from services.image_service import save_image, delete_image
 
 router = APIRouter()
 
@@ -496,8 +496,8 @@ async def analyze_and_log_meal(
                 MealEntry.date == today
             ).first()
             if del_meal:
-                if del_meal.image_path and os.path.exists(del_meal.image_path):
-                    os.remove(del_meal.image_path)
+                if del_meal.image_path:
+                    await delete_image(del_meal.image_path)
                 db.delete(del_meal)
 
         db.commit()
@@ -509,6 +509,31 @@ async def analyze_and_log_meal(
             "entry_type": "merge",
             "meal": MealResponse.model_validate(keep_meal),
             "deleted_ids": delete_meal_ids,
+            "analysis": analysis
+        }
+
+    elif entry_type == "delete":
+        meal_ids = analysis.get("meal_ids", [])
+        deleted = []
+
+        for meal_id in meal_ids:
+            meal = db.query(MealEntry).filter(
+                MealEntry.id == meal_id,
+                MealEntry.user_id == user.id,
+                MealEntry.date == today
+            ).first()
+            if meal:
+                if meal.image_path:
+                    await delete_image(meal.image_path)
+                deleted.append(meal_id)
+                db.delete(meal)
+
+        db.commit()
+        update_daily_stats(db, user.id, today)
+
+        return {
+            "entry_type": "delete",
+            "deleted_ids": deleted,
             "analysis": analysis
         }
 
