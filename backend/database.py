@@ -8,7 +8,10 @@ import os
 _default_db = "sqlite:////tmp/calorie_coach.db" if os.getenv("VERCEL") else "sqlite:///./calorie_coach.db"
 DATABASE_URL = os.getenv("DATABASE_URL", _default_db)
 
-# SQLite needs check_same_thread=False; Postgres/other DBs do not support it
+# Rewrite postgresql:// to postgresql+psycopg:// so SQLAlchemy uses psycopg v3
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:

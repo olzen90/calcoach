@@ -31,3 +31,4 @@ frontend/dist/
 # IDE
 .vscode/
 .idea/
+.vercel
