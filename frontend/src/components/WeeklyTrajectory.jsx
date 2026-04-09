@@ -1,27 +1,6 @@
-import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Minus, AlertCircle, CheckCircle } from 'lucide-react'
 
-export default function WeeklyTrajectory() {
-  const [trajectory, setTrajectory] = useState(null)
-  const [loading, setLoading] = useState(true)
-  
-  useEffect(() => {
-    fetchTrajectory()
-  }, [])
-  
-  const fetchTrajectory = async () => {
-    try {
-      const response = await fetch('/api/stats/weekly-trajectory')
-      const data = await response.json()
-      setTrajectory(data)
-    } catch (err) {
-      console.error('Failed to fetch trajectory:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  if (loading) return null
+export default function WeeklyTrajectory({ data: trajectory }) {
   if (!trajectory || trajectory.mode !== 'weekly') return null
   
   const { trajectory: data } = trajectory

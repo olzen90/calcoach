@@ -7,7 +7,7 @@ import os
 
 load_dotenv()
 
-from database import init_db, get_db, create_default_user, SessionLocal, run_migrations
+from database import init_db, get_db, create_default_user, SessionLocal
 from routes import meals, templates, progress, stats, settings
 
 
@@ -16,17 +16,12 @@ async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     init_db()
     
-    # Run migrations to add any new columns
-    run_migrations()
-    
-    # Create default user
     db = SessionLocal()
     try:
         create_default_user(db)
     finally:
         db.close()
     
-    # Only create local upload dirs when not running on Vercel
     if not os.getenv("VERCEL"):
         os.makedirs("uploads/meals", exist_ok=True)
         os.makedirs("uploads/progress", exist_ok=True)

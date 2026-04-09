@@ -119,6 +119,7 @@ class FullStats(BaseModel):
     streaks: StreakInfo
     hunger_patterns: Optional[HungerPattern]
     daily_history: List[DailySummary]
+    weekly_trajectory: Optional[dict] = None
 
 
 def get_user(db: Session) -> User:
@@ -754,13 +755,14 @@ async def get_weekly_trajectory(db: Session = Depends(get_db)):
 
 @router.get("/full", response_model=FullStats)
 async def get_full_stats(db: Session = Depends(get_db)):
-    """Get all statistics in one call."""
+    """Get all statistics in one call, including weekly trajectory."""
     today_stats = await get_today_stats(db)
     week_stats = await get_week_stats(0, db)
     month_stats = await get_month_stats(0, db)
     streak_info = await get_streak_info(db)
     hunger_patterns = await get_hunger_patterns(30, db)
     daily_history = await get_daily_history(7, db)
+    trajectory = await get_weekly_trajectory(db)
     
     return FullStats(
         today=today_stats,
@@ -768,5 +770,6 @@ async def get_full_stats(db: Session = Depends(get_db)):
         this_month=month_stats,
         streaks=streak_info,
         hunger_patterns=hunger_patterns,
-        daily_history=daily_history
+        daily_history=daily_history,
+        weekly_trajectory=trajectory
     )

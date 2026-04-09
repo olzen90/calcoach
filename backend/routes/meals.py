@@ -945,3 +945,28 @@ async def auto_log_favorites(db: Session = Depends(get_db)):
         "message": f"Auto-logged {len(logged_meals)} favorite(s)" if logged_meals else "All auto-log favorites already logged today",
         "logged": logged_meals
     }
+
+
+@router.get("/coach-init")
+async def get_coach_init(db: Session = Depends(get_db)):
+    """Single endpoint for CoachView: auto-logs favorites, then returns today + feed + trajectory."""
+    from routes.stats import get_weekly_trajectory
+
+    # 1. Auto-log favorites first (so they appear in today/feed)
+    auto_log_result = await auto_log_favorites(db)
+
+    # 2. Get today's meals + totals
+    today_data = await get_today_meals(db)
+
+    # 3. Get combined feed
+    feed_data = await get_today_feed(db)
+
+    # 4. Get weekly trajectory
+    trajectory_data = await get_weekly_trajectory(db)
+
+    return {
+        "today": today_data,
+        "feed": feed_data,
+        "weekly_trajectory": trajectory_data,
+        "auto_log": auto_log_result
+    }

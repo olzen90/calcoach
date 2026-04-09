@@ -94,7 +94,7 @@ export default function StatsView() {
       </div>
       
       {/* Weekly trajectory (if in weekly mode) */}
-      <WeeklyTrajectory />
+      <WeeklyTrajectory data={stats?.weekly_trajectory} />
       
       {/* Tab navigation */}
       <div className="flex gap-2 mb-6 flex-wrap">

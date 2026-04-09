@@ -54,26 +54,22 @@ export default function CoachView() {
     }
   }
   
-  // Auto-log favorites on page load (only once per day)
-  const autoLogFavorites = async () => {
-    try {
-      const result = await post('/meals/auto-log-favorites')
-      if (result?.logged?.length > 0) {
-        console.log('Auto-logged favorites:', result.logged)
-        // Refresh to show the new entries
-        refresh()
-        fetchFeed()
-      }
-    } catch (err) {
-      console.error('Failed to auto-log favorites:', err)
-    }
-  }
-  
   useEffect(() => {
-    refresh()
-    fetchFeed()
-    autoLogFavorites()
-    fetchWeeklyTrajectory()
+    const init = async () => {
+      try {
+        const data = await get('/meals/coach-init')
+        if (data.today) {
+          // Update the meals hook state via refresh's setter pattern
+          // We call refresh() after to sync the useTodayMeals hook
+        }
+        if (data.feed) setFeed(data.feed)
+        if (data.weekly_trajectory) setWeeklyTrajectory(data.weekly_trajectory)
+      } catch (err) {
+        console.error('Failed to load coach data:', err)
+      }
+      refresh()
+    }
+    init()
   }, [])
   
   // Handle PWA shortcut actions from URL

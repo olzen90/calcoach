@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel
 import os
 
-from database import get_db, User, MealEntry, ProgressPhoto
+from database import get_db, User, MealEntry, MealTemplate, ProgressPhoto, ExerciseConfig
 from services.image_service import delete_image
 
 router = APIRouter()
@@ -342,3 +342,34 @@ async def reset_base_prompt(db: Session = Depends(get_db)):
     db.commit()
     
     return {"status": "reset", "base_prompt": default_prompt}
+
+
+@router.get("/dashboard")
+async def get_settings_dashboard(db: Session = Depends(get_db)):
+    """Single endpoint for SettingsView: settings + exercises + storage + favorites."""
+    user = get_user(db)
+
+    settings_data = await get_settings(db)
+    storage_data = await get_storage_info(db)
+
+    exercises_list = db.query(ExerciseConfig).filter(
+        ExerciseConfig.user_id == user.id,
+        ExerciseConfig.is_active == True
+    ).order_by(ExerciseConfig.display_order).all()
+
+    favorites_list = db.query(MealTemplate).filter(
+        MealTemplate.user_id == user.id
+    ).order_by(MealTemplate.use_count.desc()).all()
+
+    return {
+        "settings": settings_data,
+        "exercises": [{"id": e.id, "name": e.name, "display_order": e.display_order, "is_active": e.is_active} for e in exercises_list],
+        "storage": storage_data,
+        "favorites": [{
+            "id": f.id, "name": f.name, "description": f.description,
+            "calories": f.calories, "protein_g": f.protein_g, "carbs_g": f.carbs_g,
+            "fat_g": f.fat_g, "sugar_g": f.sugar_g or 0, "fiber_g": f.fiber_g or 0,
+            "sodium_mg": f.sodium_mg or 0, "breakdown": f.breakdown, "emoji": f.emoji,
+            "use_count": f.use_count, "auto_log": f.auto_log, "created_at": f.created_at.isoformat()
+        } for f in favorites_list]
+    }
