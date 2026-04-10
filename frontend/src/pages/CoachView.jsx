@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { Camera, Mic, MicOff, Send, Sparkles, Scale, Ruler, Dumbbell, CheckCircle, ChevronDown, ChevronUp, MessageCircle, Pencil, X, Plus } from 'lucide-react'
@@ -353,14 +353,29 @@ export default function CoachView() {
   }
   
   // Auto-resize textarea when input changes (e.g., from voice input)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = '58px'
-      if (textareaRef.current.scrollHeight > 58) {
-        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
-      }
+      const el = textareaRef.current
+      el.style.height = '58px'
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+      el.scrollTop = el.scrollHeight
     }
   }, [input])
+
+  // Prevent page scroll when scrolling inside the textarea on mobile
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+
+    const onTouchMove = (e) => {
+      if (el.scrollHeight > el.clientHeight) {
+        e.stopPropagation()
+      }
+    }
+
+    el.addEventListener('touchmove', onTouchMove, { passive: true })
+    return () => el.removeEventListener('touchmove', onTouchMove)
+  }, [])
   
   if (loading && !meals) {
     return (
@@ -592,22 +607,18 @@ export default function CoachView() {
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value)
-                  // Auto-resize only when content needs more space (more than one line)
                   e.target.style.height = '58px'
-                  if (e.target.scrollHeight > 58) {
-                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-                  }
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
                 }}
                 onKeyDown={(e) => {
-                  // Submit on Enter without Shift
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     handleSubmit(e)
                   }
                 }}
                 placeholder={imagePreview ? "Ask anything" : "Log or ask anything..."}
-                className="w-full resize-none overflow-hidden pl-12 pr-24 bg-transparent border-none outline-none text-gray-700 placeholder-gray-400"
-                style={{ height: '58px', paddingTop: '1rem', paddingBottom: '1rem' }}
+                className="w-full resize-none bg-transparent border-none outline-none text-gray-700 placeholder-gray-400 pl-12 pr-24 scrollbar-hide"
+                style={{ minHeight: '58px', maxHeight: '120px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingTop: '1rem', paddingBottom: '1rem' }}
                 disabled={submitting}
                 rows={1}
               />
