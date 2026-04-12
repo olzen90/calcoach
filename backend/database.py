@@ -278,7 +278,7 @@ def create_default_user(db):
             ("Bench Press", 2),
             ("Deadlift", 3),
             ("Overhead Press", 4),
-            ("Barbell Row", 5),
+            ("Cable Row", 5),
         ]
         for name, order in default_exercises:
             exercise = ExerciseConfig(

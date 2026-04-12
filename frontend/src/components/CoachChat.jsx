@@ -9,6 +9,8 @@ export default function CoachChat({ feed, meals, onRefresh }) {
   const [editValues, setEditValues] = useState({})
   const [expandedDetails, setExpandedDetails] = useState(null)
   const [fullscreenImage, setFullscreenImage] = useState(null) // { src, alt }
+  const [templates, setTemplates] = useState([]) // loaded favorites
+  const [toast, setToast] = useState(null) // { text, type }
   
   // Lock body scroll when fullscreen image is open
   useEffect(() => {
@@ -27,8 +29,29 @@ export default function CoachChat({ feed, meals, onRefresh }) {
   const [sortOrder, setSortOrder] = useState(() => 
     localStorage.getItem('coach_sort_order') || 'asc'
   ) // 'asc' = oldest first, 'desc' = newest first
-  const { put, del, post, loading } = useApi()
-  
+  const { get, put, del, post, loading } = useApi()
+
+  const showToast = (text, type = 'success') => {
+    setToast({ text, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const fetchTemplates = async () => {
+    try {
+      const data = await get('/templates/')
+      setTemplates(data || [])
+    } catch (err) {
+      console.error('Failed to load templates:', err)
+    }
+  }
+
+  useEffect(() => {
+    fetchTemplates()
+  }, [feed])
+
+  const getTemplateForMeal = (meal) =>
+    templates.find(t => t.name === meal.description)
+
   // Save filter to localStorage when it changes
   const handleFilterChange = (newFilter) => {
     setFilter(newFilter)
@@ -159,24 +182,32 @@ export default function CoachChat({ feed, meals, onRefresh }) {
     }
   }
   
-  const handleSaveAsTemplate = async (meal) => {
+  const handleToggleFavorite = async (meal) => {
+    const existing = getTemplateForMeal(meal)
     try {
-      await post('/templates/', {
-        name: meal.description,
-        description: meal.description,
-        calories: meal.calories,
-        protein_g: meal.protein_g,
-        carbs_g: meal.carbs_g,
-        fat_g: meal.fat_g,
-        sugar_g: meal.sugar_g || 0,
-        fiber_g: meal.fiber_g || 0,
-        sodium_mg: meal.sodium_mg || 0,
-        breakdown: meal.breakdown || null,
-        emoji: meal.emoji || null
-      })
-      alert('Saved as template!')
+      if (existing) {
+        await del(`/templates/${existing.id}`)
+        showToast('Removed from favorites')
+      } else {
+        await post('/templates/', {
+          name: meal.description,
+          description: meal.description,
+          calories: meal.calories,
+          protein_g: meal.protein_g || 0,
+          carbs_g: meal.carbs_g || 0,
+          fat_g: meal.fat_g || 0,
+          sugar_g: meal.sugar_g || 0,
+          fiber_g: meal.fiber_g || 0,
+          sodium_mg: meal.sodium_mg || 0,
+          breakdown: meal.breakdown || null,
+          emoji: meal.emoji || null
+        })
+        showToast('Added to favorites!')
+      }
+      await fetchTemplates()
     } catch (err) {
-      console.error('Failed to save template:', err)
+      console.error('Failed to toggle favorite:', err)
+      showToast('Failed to update favorite', 'error')
     }
   }
   
@@ -308,11 +339,15 @@ export default function CoachChat({ feed, meals, onRefresh }) {
             ) : (
               <>
                 <button
-                  onClick={() => handleSaveAsTemplate(meal)}
-                  className="p-1.5 rounded-lg hover:bg-yellow-100 text-gray-400 hover:text-yellow-600"
-                  title="Save as template"
+                  onClick={() => handleToggleFavorite(meal)}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    getTemplateForMeal(meal)
+                      ? 'bg-yellow-100 text-yellow-500 hover:bg-yellow-200'
+                      : 'hover:bg-yellow-100 text-gray-400 hover:text-yellow-600'
+                  }`}
+                  title={getTemplateForMeal(meal) ? 'Remove from favorites' : 'Save as favorite'}
                 >
-                  <Bookmark className="w-4 h-4" />
+                  <Bookmark className={`w-4 h-4 ${getTemplateForMeal(meal) ? 'fill-yellow-400' : ''}`} />
                 </button>
                 <button
                   onClick={() => handleEdit(meal)}
@@ -497,6 +532,15 @@ export default function CoachChat({ feed, meals, onRefresh }) {
   
   return (
     <div>
+      {/* Favorite toast */}
+      {toast && (
+        <div className={`fixed top-4 left-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg animate-slide-up ${
+          toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
+        } text-white`}>
+          <span className="font-medium">{toast.text}</span>
+        </div>
+      )}
+
       {/* Filter tabs - only show when there's data */}
       {hasFeed && <FilterTabs />}
       

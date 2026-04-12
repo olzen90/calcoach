@@ -17,7 +17,8 @@ export default function CoachView() {
   const [feed, setFeed] = useState(null)
   const [weeklyTrajectory, setWeeklyTrajectory] = useState(null)
   
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(() => sessionStorage.getItem('coach_draft') || '')
+  const [inputHeight, setInputHeight] = useState(() => parseInt(sessionStorage.getItem('coach_draft_height') || '58', 10))
   const [image, setImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -173,12 +174,24 @@ export default function CoachView() {
   const handleSubmit = async (e, skipBudgetCheck = false) => {
     e?.preventDefault()
     if (!input.trim() && !image) return
+
+    const submittedInput = input
+    const submittedImage = image
+
+    // Clear input immediately so the field is ready for the next entry
+    setInput('')
+    setInputHeight(58)
+    sessionStorage.removeItem('coach_draft')
+    sessionStorage.removeItem('coach_draft_height')
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '58px'
+    }
     
     try {
       const formData = new FormData()
-      formData.append('description', input || 'Food from image')
-      if (image) {
-        formData.append('image', image)
+      formData.append('description', submittedInput || 'Food from image')
+      if (submittedImage) {
+        formData.append('image', submittedImage)
       }
       // Send user's local time (for meals without explicit time in description)
       const now = new Date()
@@ -201,10 +214,8 @@ export default function CoachView() {
               meal: preview.meal,
               calories: mealCalories,
               budgetRemaining: Math.max(0, remaining),
-              // Store input state for re-submission
-              savedInput: input,
-              savedImage: image,
-              // Store the full analysis so we can save it directly on confirm
+              savedInput: submittedInput,
+              savedImage: submittedImage,
               confirmedAnalysis: preview.analysis
             })
             return
@@ -233,12 +244,7 @@ export default function CoachView() {
         setTimeout(() => setLastEntry(null), 4000)
       }
       
-      setInput('')
       clearImage()
-      // Reset textarea height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = '58px'
-      }
       
       // Refresh data
       if (entryType === 'meal' || entryType === 'edit' || entryType === 'merge') {
@@ -269,27 +275,23 @@ export default function CoachView() {
   
   const handleConfirmOverBudget = async () => {
     if (!overBudgetWarning) return
-    
-    // Restore input state and submit without budget check
-    setInput(overBudgetWarning.savedInput)
-    if (overBudgetWarning.savedImage) {
-      setImage(overBudgetWarning.savedImage)
-    }
+
+    const { savedInput, savedImage, confirmedAnalysis } = overBudgetWarning
     setOverBudgetWarning(null)
     
     // Create new FormData and submit directly, passing the already-analyzed data
     // to avoid a second AI call that could return different calorie estimates
     const formData = new FormData()
-    formData.append('description', overBudgetWarning.savedInput || 'Food from image')
-    if (overBudgetWarning.savedImage) {
-      formData.append('image', overBudgetWarning.savedImage)
+    formData.append('description', savedInput || 'Food from image')
+    if (savedImage) {
+      formData.append('image', savedImage)
     }
     // Send user's local time
     const now = new Date()
     const localTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     formData.append('local_time', localTime)
-    if (overBudgetWarning.confirmedAnalysis) {
-      formData.append('confirmed_analysis', JSON.stringify(overBudgetWarning.confirmedAnalysis))
+    if (confirmedAnalysis) {
+      formData.append('confirmed_analysis', JSON.stringify(confirmedAnalysis))
     }
     
     try {
@@ -306,11 +308,7 @@ export default function CoachView() {
         setTimeout(() => setLastEntry(null), 4000)
       }
       
-      setInput('')
       clearImage()
-      if (textareaRef.current) {
-        textareaRef.current.style.height = '58px'
-      }
       
       if (entryType === 'meal' || entryType === 'edit' || entryType === 'merge') {
         await refresh()
@@ -334,12 +332,23 @@ export default function CoachView() {
   }
   
   const handleCancelOverBudget = () => {
+    // Restore the text so the user can modify and resubmit
+    if (overBudgetWarning?.savedInput) {
+      setInput(overBudgetWarning.savedInput)
+      sessionStorage.setItem('coach_draft', overBudgetWarning.savedInput)
+    }
+    if (overBudgetWarning?.savedImage) {
+      setImage(overBudgetWarning.savedImage)
+    }
     setOverBudgetWarning(null)
-    // Keep the input so user can modify it
   }
   
   const handleVoiceResult = (text) => {
-    setInput(prev => prev + (prev ? ' ' : '') + text)
+    setInput(prev => {
+      const next = prev + (prev ? ' ' : '') + text
+      sessionStorage.setItem('coach_draft', next)
+      return next
+    })
   }
   
   // Auto-resize textarea when input changes (e.g., from voice input)
@@ -347,8 +356,11 @@ export default function CoachView() {
     if (textareaRef.current) {
       const el = textareaRef.current
       el.style.height = '58px'
-      el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+      const newHeight = Math.min(el.scrollHeight, 120)
+      el.style.height = newHeight + 'px'
       el.scrollTop = el.scrollHeight
+      setInputHeight(newHeight)
+      if (input) sessionStorage.setItem('coach_draft_height', String(newHeight))
     }
   }, [input])
 
@@ -596,9 +608,16 @@ export default function CoachView() {
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => {
-                  setInput(e.target.value)
+                  const val = e.target.value
+                  setInput(val)
+                  if (val) sessionStorage.setItem('coach_draft', val)
+                  else sessionStorage.removeItem('coach_draft')
                   e.target.style.height = '58px'
-                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                  const newHeight = Math.min(e.target.scrollHeight, 120)
+                  e.target.style.height = newHeight + 'px'
+                  setInputHeight(newHeight)
+                  if (val) sessionStorage.setItem('coach_draft_height', String(newHeight))
+                  else sessionStorage.removeItem('coach_draft_height')
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -608,7 +627,7 @@ export default function CoachView() {
                 }}
                 placeholder={imagePreview ? "Ask anything" : "Log or ask anything..."}
                 className="w-full resize-none bg-transparent border-none outline-none text-gray-700 placeholder-gray-400 pl-12 pr-24 scrollbar-hide"
-                style={{ minHeight: '58px', maxHeight: '120px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingTop: '1rem', paddingBottom: '1rem' }}
+                style={{ height: `${inputHeight}px`, minHeight: '58px', maxHeight: '120px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingTop: '1rem', paddingBottom: '1rem' }}
                 disabled={submitting}
                 rows={1}
               />

@@ -244,7 +244,7 @@ export default function ProgressView() {
             <div className="card">
               <h3 className="font-semibold text-gray-800 mb-3">Lift PRs</h3>
               <div className="space-y-2">
-                {progress.lifts.slice(0, 3).map(lift => (
+                {progress.lifts.map(lift => (
                   <div key={lift.exercise_id} className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">{lift.exercise_name}</span>
                     <span className="text-sm font-semibold">

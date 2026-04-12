@@ -15,6 +15,7 @@ export default function LiftLogger({ lifts, onRefresh }) {
   const [editingId, setEditingId] = useState(null)
   const [editWeight, setEditWeight] = useState('')
   const [editReps, setEditReps] = useState('')
+  const [sessionLifts, setSessionLifts] = useState([]) // lifts logged in this session
   
   useEffect(() => {
     fetchExercises()
@@ -41,14 +42,24 @@ export default function LiftLogger({ lifts, onRefresh }) {
         weight_kg: parseFloat(weight),
         reps: parseInt(reps)
       })
-      
+
+      const exerciseName = exercises.find(ex => ex.id === selectedExercise)?.name || ''
+      setSessionLifts(prev => [...prev, {
+        exercise: exerciseName,
+        weight: parseFloat(weight),
+        reps: parseInt(reps)
+      }])
       setWeight('')
       setReps('')
-      setShowLog(false)
       onRefresh()
     } catch (err) {
       console.error('Failed to log lift:', err)
     }
+  }
+
+  const handleCloseLog = () => {
+    setShowLog(false)
+    setSessionLifts([])
   }
   
   const handleEditLift = (entry) => {
@@ -93,7 +104,7 @@ export default function LiftLogger({ lifts, onRefresh }) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm animate-scale-in">
             <h3 className="text-lg font-display font-semibold text-gray-800 mb-4">
-              Log Lift
+              Log Lifts
             </h3>
             
             {/* Exercise selector */}
@@ -111,7 +122,7 @@ export default function LiftLogger({ lifts, onRefresh }) {
             </div>
             
             {/* Weight and reps */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm text-gray-500 mb-2">Weight (kg)</label>
                 <input
@@ -134,22 +145,34 @@ export default function LiftLogger({ lifts, onRefresh }) {
                 />
               </div>
             </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowLog(false)}
-                className="btn-secondary flex-1"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLogLift}
-                disabled={!weight || !reps}
-                className="btn-primary flex-1 disabled:opacity-50"
-              >
-                Save
-              </button>
-            </div>
+
+            <button
+              onClick={handleLogLift}
+              disabled={!weight || !reps}
+              className="btn-primary w-full disabled:opacity-50 mb-4"
+            >
+              + Add Lift
+            </button>
+
+            {/* Session lifts logged so far */}
+            {sessionLifts.length > 0 && (
+              <div className="mb-4 bg-gray-50 rounded-2xl p-3 space-y-1">
+                <p className="text-xs text-gray-400 mb-2">Logged this session</p>
+                {sessionLifts.map((l, i) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-gray-600">{l.exercise}</span>
+                    <span className="font-medium text-gray-800">{l.weight} kg × {l.reps}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={handleCloseLog}
+              className="btn-secondary w-full"
+            >
+              {sessionLifts.length > 0 ? 'Done' : 'Cancel'}
+            </button>
           </div>
         </div>
       )}

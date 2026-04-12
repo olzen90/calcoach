@@ -30,7 +30,7 @@ class GoalSettings(BaseModel):
 
 
 class AISettings(BaseModel):
-    base_prompt: Optional[str]
+    base_prompt: Optional[str] = None
     voice_language: Optional[str] = None
 
 

@@ -1035,12 +1035,23 @@ Average daily intake:
 
 Foods eaten: {', '.join(set(breakdown_items[:80]))}
 
-Provide a concise, actionable diet assessment. Respond ONLY with this exact JSON structure:
+Provide a concise, actionable diet assessment following these rules:
+
+STRENGTHS rules:
+- Include whether the diet is well-balanced across food groups (protein sources, vegetables, whole grains, healthy fats). If it is, say so explicitly.
+- Highlight genuine positives (hitting protein goals, good fiber intake, variety, etc).
+
+IMPROVEMENTS rules:
+- If the diet is NOT balanced (e.g. lacking vegetables, relying on the same few foods, missing food groups), call this out explicitly.
+- For each improvement, suggest 1-2 SPECIFIC foods the user could add or eat more of, chosen to complement their existing eating habits and foods they already enjoy. Make the food suggestions feel natural given what they already eat (e.g. if they eat chicken, suggest adding a side of roasted vegetables; if they eat pasta, suggest adding lentils).
+- Keep suggestions practical and realistic.
+
+Respond ONLY with this exact JSON structure:
 {{
   "status": "on_track" | "needs_attention" | "off_track",
   "summary": "1-2 sentence overall assessment",
   "strengths": ["strength 1", "strength 2"],
-  "improvements": ["specific actionable suggestion 1", "specific actionable suggestion 2"],
+  "improvements": ["specific actionable suggestion with food examples 1", "specific actionable suggestion with food examples 2"],
   "micronutrient_flags": [
     {{"nutrient": "Vitamin D", "concern": "low" | "moderate", "suggestion": "Add fatty fish or fortified dairy"}}
   ]
