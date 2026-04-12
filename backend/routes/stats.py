@@ -69,6 +69,15 @@ class WeeklySummary(BaseModel):
     avg_daily_calcium_mg: float = 0
     avg_daily_potassium_mg: float = 0
     avg_daily_magnesium_mg: float = 0
+    total_vitamin_a_mcg: float = 0
+    total_vitamin_c_mg: float = 0
+    total_vitamin_d_mcg: float = 0
+    total_vitamin_b12_mcg: float = 0
+    total_iron_mg: float = 0
+    total_calcium_mg: float = 0
+    total_potassium_mg: float = 0
+    total_magnesium_mg: float = 0
+    period_days: int = 7
     days_tracked: int
     days_on_goal: int
     calorie_goal_weekly: int
@@ -105,6 +114,15 @@ class MonthlySummary(BaseModel):
     avg_daily_calcium_mg: float = 0
     avg_daily_potassium_mg: float = 0
     avg_daily_magnesium_mg: float = 0
+    total_vitamin_a_mcg: float = 0
+    total_vitamin_c_mg: float = 0
+    total_vitamin_d_mcg: float = 0
+    total_vitamin_b12_mcg: float = 0
+    total_iron_mg: float = 0
+    total_calcium_mg: float = 0
+    total_potassium_mg: float = 0
+    total_magnesium_mg: float = 0
+    period_days: int = 30
     days_tracked: int
     days_on_goal: int
     protein_goal_g: int = 150
@@ -148,6 +166,14 @@ class CustomRangeSummary(BaseModel):
     avg_daily_fiber_g: float = 0
     total_sodium_mg: float = 0
     avg_daily_sodium_mg: float = 0
+    total_vitamin_a_mcg: float = 0
+    total_vitamin_c_mg: float = 0
+    total_vitamin_d_mcg: float = 0
+    total_vitamin_b12_mcg: float = 0
+    total_iron_mg: float = 0
+    total_calcium_mg: float = 0
+    total_potassium_mg: float = 0
+    total_magnesium_mg: float = 0
     days_tracked: int
     days_on_goal: int
     calorie_goal: int
@@ -319,6 +345,15 @@ async def get_week_stats(
         avg_daily_calcium_mg=round(total_calcium / denom, 1),
         avg_daily_potassium_mg=round(total_potassium / denom, 1),
         avg_daily_magnesium_mg=round(total_magnesium / denom, 1),
+        total_vitamin_a_mcg=round(total_vitamin_a, 1),
+        total_vitamin_c_mg=round(total_vitamin_c, 1),
+        total_vitamin_d_mcg=round(total_vitamin_d, 1),
+        total_vitamin_b12_mcg=round(total_vitamin_b12, 1),
+        total_iron_mg=round(total_iron, 1),
+        total_calcium_mg=round(total_calcium, 1),
+        total_potassium_mg=round(total_potassium, 1),
+        total_magnesium_mg=round(total_magnesium, 1),
+        period_days=7,
         days_tracked=days_tracked,
         days_on_goal=days_on_goal,
         calorie_goal_weekly=user.daily_calorie_goal * 7,
@@ -422,6 +457,15 @@ async def get_month_stats(
         avg_daily_calcium_mg=round(total_calcium / denom, 1),
         avg_daily_potassium_mg=round(total_potassium / denom, 1),
         avg_daily_magnesium_mg=round(total_magnesium / denom, 1),
+        total_vitamin_a_mcg=round(total_vitamin_a, 1),
+        total_vitamin_c_mg=round(total_vitamin_c, 1),
+        total_vitamin_d_mcg=round(total_vitamin_d, 1),
+        total_vitamin_b12_mcg=round(total_vitamin_b12, 1),
+        total_iron_mg=round(total_iron, 1),
+        total_calcium_mg=round(total_calcium, 1),
+        total_potassium_mg=round(total_potassium, 1),
+        total_magnesium_mg=round(total_magnesium, 1),
+        period_days=(month_end - month_start).days + 1,
         days_tracked=days_tracked,
         days_on_goal=days_on_goal,
         protein_goal_g=user.protein_goal_g,
@@ -462,6 +506,14 @@ async def get_custom_range_stats(
     total_sugar = sum(m.sugar_g or 0 for m in meals)
     total_fiber = sum(m.fiber_g or 0 for m in meals)
     total_sodium = sum(m.sodium_mg or 0 for m in meals)
+    total_vitamin_a = sum(getattr(m, 'vitamin_a_mcg', 0) or 0 for m in meals)
+    total_vitamin_c = sum(getattr(m, 'vitamin_c_mg', 0) or 0 for m in meals)
+    total_vitamin_d = sum(getattr(m, 'vitamin_d_mcg', 0) or 0 for m in meals)
+    total_vitamin_b12 = sum(getattr(m, 'vitamin_b12_mcg', 0) or 0 for m in meals)
+    total_iron = sum(getattr(m, 'iron_mg', 0) or 0 for m in meals)
+    total_calcium = sum(getattr(m, 'calcium_mg', 0) or 0 for m in meals)
+    total_potassium = sum(getattr(m, 'potassium_mg', 0) or 0 for m in meals)
+    total_magnesium = sum(getattr(m, 'magnesium_mg', 0) or 0 for m in meals)
     
     # Get unique days with entries
     days_with_entries = set(m.date for m in meals)
@@ -533,6 +585,14 @@ async def get_custom_range_stats(
         avg_daily_fiber_g=avg_daily_fiber,
         total_sodium_mg=total_sodium,
         avg_daily_sodium_mg=avg_daily_sodium,
+        total_vitamin_a_mcg=round(total_vitamin_a, 1),
+        total_vitamin_c_mg=round(total_vitamin_c, 1),
+        total_vitamin_d_mcg=round(total_vitamin_d, 1),
+        total_vitamin_b12_mcg=round(total_vitamin_b12, 1),
+        total_iron_mg=round(total_iron, 1),
+        total_calcium_mg=round(total_calcium, 1),
+        total_potassium_mg=round(total_potassium, 1),
+        total_magnesium_mg=round(total_magnesium, 1),
         days_tracked=days_tracked,
         days_on_goal=days_on_goal,
         calorie_goal=user.daily_calorie_goal,

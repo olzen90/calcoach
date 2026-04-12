@@ -124,40 +124,65 @@ export default function StatsView() {
     if (activeTab === 'today' && stats?.today) {
       const t = stats.today
       return {
-        vitamin_a_mcg: t.total_vitamin_a_mcg || 0,
-        vitamin_c_mg: t.total_vitamin_c_mg || 0,
-        vitamin_d_mcg: t.total_vitamin_d_mcg || 0,
-        vitamin_b12_mcg: t.total_vitamin_b12_mcg || 0,
-        iron_mg: t.total_iron_mg || 0,
-        calcium_mg: t.total_calcium_mg || 0,
-        potassium_mg: t.total_potassium_mg || 0,
-        magnesium_mg: t.total_magnesium_mg || 0,
+        values: {
+          vitamin_a_mcg: t.total_vitamin_a_mcg || 0,
+          vitamin_c_mg: t.total_vitamin_c_mg || 0,
+          vitamin_d_mcg: t.total_vitamin_d_mcg || 0,
+          vitamin_b12_mcg: t.total_vitamin_b12_mcg || 0,
+          iron_mg: t.total_iron_mg || 0,
+          calcium_mg: t.total_calcium_mg || 0,
+          potassium_mg: t.total_potassium_mg || 0,
+          magnesium_mg: t.total_magnesium_mg || 0,
+        },
+        periodDays: 1,
       }
     }
     if (activeTab === 'week' && stats?.this_week) {
       const w = stats.this_week
       return {
-        vitamin_a_mcg: w.avg_daily_vitamin_a_mcg || 0,
-        vitamin_c_mg: w.avg_daily_vitamin_c_mg || 0,
-        vitamin_d_mcg: w.avg_daily_vitamin_d_mcg || 0,
-        vitamin_b12_mcg: w.avg_daily_vitamin_b12_mcg || 0,
-        iron_mg: w.avg_daily_iron_mg || 0,
-        calcium_mg: w.avg_daily_calcium_mg || 0,
-        potassium_mg: w.avg_daily_potassium_mg || 0,
-        magnesium_mg: w.avg_daily_magnesium_mg || 0,
+        values: {
+          vitamin_a_mcg: w.total_vitamin_a_mcg || 0,
+          vitamin_c_mg: w.total_vitamin_c_mg || 0,
+          vitamin_d_mcg: w.total_vitamin_d_mcg || 0,
+          vitamin_b12_mcg: w.total_vitamin_b12_mcg || 0,
+          iron_mg: w.total_iron_mg || 0,
+          calcium_mg: w.total_calcium_mg || 0,
+          potassium_mg: w.total_potassium_mg || 0,
+          magnesium_mg: w.total_magnesium_mg || 0,
+        },
+        periodDays: w.period_days || 7,
       }
     }
     if (activeTab === 'month' && stats?.this_month) {
       const m = stats.this_month
       return {
-        vitamin_a_mcg: m.avg_daily_vitamin_a_mcg || 0,
-        vitamin_c_mg: m.avg_daily_vitamin_c_mg || 0,
-        vitamin_d_mcg: m.avg_daily_vitamin_d_mcg || 0,
-        vitamin_b12_mcg: m.avg_daily_vitamin_b12_mcg || 0,
-        iron_mg: m.avg_daily_iron_mg || 0,
-        calcium_mg: m.avg_daily_calcium_mg || 0,
-        potassium_mg: m.avg_daily_potassium_mg || 0,
-        magnesium_mg: m.avg_daily_magnesium_mg || 0,
+        values: {
+          vitamin_a_mcg: m.total_vitamin_a_mcg || 0,
+          vitamin_c_mg: m.total_vitamin_c_mg || 0,
+          vitamin_d_mcg: m.total_vitamin_d_mcg || 0,
+          vitamin_b12_mcg: m.total_vitamin_b12_mcg || 0,
+          iron_mg: m.total_iron_mg || 0,
+          calcium_mg: m.total_calcium_mg || 0,
+          potassium_mg: m.total_potassium_mg || 0,
+          magnesium_mg: m.total_magnesium_mg || 0,
+        },
+        periodDays: m.period_days || 30,
+      }
+    }
+    if (activeTab === 'custom' && customStats) {
+      const c = customStats
+      return {
+        values: {
+          vitamin_a_mcg: c.total_vitamin_a_mcg || 0,
+          vitamin_c_mg: c.total_vitamin_c_mg || 0,
+          vitamin_d_mcg: c.total_vitamin_d_mcg || 0,
+          vitamin_b12_mcg: c.total_vitamin_b12_mcg || 0,
+          iron_mg: c.total_iron_mg || 0,
+          calcium_mg: c.total_calcium_mg || 0,
+          potassium_mg: c.total_potassium_mg || 0,
+          magnesium_mg: c.total_magnesium_mg || 0,
+        },
+        periodDays: c.total_days || 1,
       }
     }
     return null
@@ -382,7 +407,7 @@ export default function StatsView() {
       )}
 
       {/* ── VITAMINS & MINERALS ── */}
-      {vitaminData && <VitaminSection vitamins={vitaminData} />}
+      {vitaminData && <VitaminSection vitamins={vitaminData.values} periodDays={vitaminData.periodDays} />}
 
       {/* ── PROTEIN PER KG (all tabs when weight logged) ── */}
       {macroData && (
@@ -771,9 +796,11 @@ const VITAMIN_RDI = {
   magnesium_mg:    { label: 'Magnesium', unit: 'mg',  rdi: 400,  color: 'bg-teal-100 text-teal-700' },
 }
 
-function VitaminSection({ vitamins }) {
+function VitaminSection({ vitamins, periodDays = 1 }) {
   const hasAny = Object.keys(VITAMIN_RDI).some(k => (vitamins?.[k] || 0) > 0)
   if (!hasAny) return null
+
+  const periodLabel = periodDays === 1 ? 'daily' : `${periodDays}-day`
 
   return (
     <div className="card mt-6">
@@ -781,11 +808,13 @@ function VitaminSection({ vitamins }) {
       <p className="text-xs text-gray-400 mb-4">AI estimates based on logged foods — use as a rough guide</p>
       <div className="space-y-3">
         {Object.entries(VITAMIN_RDI).map(([key, { label, unit, rdi, color }]) => {
+          const periodRdi = rdi * periodDays
           const value = vitamins?.[key] || 0
-          const pct = Math.min(Math.round((value / rdi) * 100), 100)
-          const over = Math.round((value / rdi) * 100) > 100
+          const pct = Math.min(Math.round((value / periodRdi) * 100), 100)
+          const over = Math.round((value / periodRdi) * 100) > 100
           const status = pct >= 80 ? 'good' : pct >= 40 ? 'moderate' : 'low'
           const barColor = status === 'good' ? 'bg-green-400' : status === 'moderate' ? 'bg-amber-400' : 'bg-red-400'
+          const displayRdi = periodRdi % 1 === 0 ? periodRdi : periodRdi.toFixed(1)
           return (
             <div key={key}>
               <div className="flex justify-between items-baseline mb-1">
@@ -796,7 +825,7 @@ function VitaminSection({ vitamins }) {
                   <span className="text-sm font-semibold text-gray-700">
                     {value % 1 === 0 ? value : value.toFixed(1)}{unit}
                   </span>
-                  <span className="text-xs text-gray-400 ml-1">/ {rdi}{unit}</span>
+                  <span className="text-xs text-gray-400 ml-1">/ {displayRdi}{unit}</span>
                   {over && <span className="text-xs text-green-500 ml-1">✓</span>}
                 </div>
               </div>
@@ -810,7 +839,7 @@ function VitaminSection({ vitamins }) {
           )
         })}
       </div>
-      <p className="text-xs text-gray-300 mt-4">RDI = Reference Daily Intake for an average adult</p>
+      <p className="text-xs text-gray-300 mt-4">RDI = Reference Daily Intake for an average adult × {periodLabel} period</p>
     </div>
   )
 }
