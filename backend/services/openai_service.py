@@ -145,6 +145,11 @@ IMPORTANT FOR MEAL BREAKDOWN:
 
 3. The sum of all breakdown items MUST EXACTLY EQUAL the main totals (calories, protein_g, carbs_g, fat_g, sugar_g, fiber_g, sodium_mg). Double-check your math before responding.
 
+4. CRITICAL - Quantities and portions: When the user specifies a count (e.g. "4 pieces", "4 stykker", "2 bars", "3 squares"), you MUST calculate nutrition for EXACTLY that count. Start from the nutrition of ONE piece/unit, then multiply by the exact number given. Never estimate a different quantity than what the user states. Examples:
+   - "4 pieces of Ritter Sport" → find nutrition for 1 piece (1 square ≈ 6g for a 100g bar with 16 squares), multiply by 4
+   - "2 slices of bread" → nutrition for 1 slice × 2
+   If you are unsure of the exact piece size, state your assumption in the notes field.
+
 For EDIT entries (modifying an existing meal):
 {
   "entry_type": "edit",
@@ -162,6 +167,12 @@ For EDIT entries (modifying an existing meal):
   "breakdown": [{"item": string, "amount": string, "calories": number (integer), "protein_g": number (max 1 decimal), "carbs_g": number (max 1 decimal), "fat_g": number (max 1 decimal), "sugar_g": number (max 1 decimal), "fiber_g": number (max 1 decimal), "sodium_mg": number (integer)}] (REQUIRED - always provide the COMPLETE updated breakdown. If the meal has existing breakdown items (shown in CURRENT BREAKDOWN), start from those and update/add/remove items as needed to reflect the change. The breakdown items MUST sum to the updated totals. Always use grams for amounts.),
   "notes": string (explain what was changed and why)
 }
+
+CRITICAL FOR EDITS INVOLVING QUANTITY CORRECTIONS: When the user corrects the number of pieces/units (e.g. "it was only 4 pieces", "actually just 2 slices"), you must:
+1. Determine the per-piece nutrition from the existing meal total (existing_total ÷ original_count = per_piece)
+2. Multiply per-piece nutrition by the NEW count to get the corrected totals
+3. Never guess a different quantity — use EXACTLY the number the user states
+Example: meal logged as 640 kcal for "ritter sport" (assumed 1 bar = ~16 pieces). User says "only 4 pieces". Per piece = 640/16 = 40 kcal. Corrected = 4 × 40 = 160 kcal.
 
 For DELETE entries (removing one or more meals):
 {

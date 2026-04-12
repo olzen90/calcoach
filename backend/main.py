@@ -48,10 +48,8 @@ app.add_middleware(
 
 # Mount static files for local dev only (Vercel uses Blob storage)
 if not os.getenv("VERCEL"):
-    try:
-        app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-    except RuntimeError:
-        pass  # uploads dir not yet created on first start
+    os.makedirs("uploads", exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include routers
 app.include_router(meals.router, prefix="/api/meals", tags=["Meals"])
