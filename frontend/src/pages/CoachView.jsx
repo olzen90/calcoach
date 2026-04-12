@@ -54,21 +54,24 @@ export default function CoachView() {
   
   useEffect(() => {
     const init = async () => {
-      try {
-        const data = await get('/meals/coach-init')
+      const [coachResult, settingsResult] = await Promise.allSettled([
+        get('/meals/coach-init'),
+        get('/settings/'),
+      ])
+
+      if (coachResult.status === 'fulfilled') {
+        const data = coachResult.value
         if (data.today) setMeals(data.today)
         if (data.feed) setFeed(data.feed)
         if (data.weekly_trajectory) setWeeklyTrajectory(data.weekly_trajectory)
-      } catch (err) {
-        console.error('Failed to load coach data:', err)
+      } else {
+        console.error('Failed to load coach data:', coachResult.reason)
         refresh()
       }
-      // Load voice language from settings
-      try {
-        const settings = await get('/settings/')
+
+      if (settingsResult.status === 'fulfilled') {
+        const settings = settingsResult.value
         if (settings.voice_language) setVoiceLanguage(settings.voice_language)
-      } catch {
-        // fall back to default
       }
     }
     init()

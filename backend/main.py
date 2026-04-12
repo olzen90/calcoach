@@ -7,7 +7,7 @@ import os
 
 load_dotenv()
 
-from database import init_db, get_db, create_default_user, SessionLocal
+from database import init_db, run_migrations, get_db, create_default_user, SessionLocal
 from routes import meals, templates, progress, stats, settings
 
 
@@ -15,7 +15,8 @@ from routes import meals, templates, progress, stats, settings
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     init_db()
-    
+    run_migrations()
+
     db = SessionLocal()
     try:
         create_default_user(db)
