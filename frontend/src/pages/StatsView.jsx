@@ -119,6 +119,51 @@ export default function StatsView() {
 
   const macroData = getMacroData()
 
+  // Vitamin data for current tab (today = totals, others = avg per day)
+  const getVitaminData = () => {
+    if (activeTab === 'today' && stats?.today) {
+      const t = stats.today
+      return {
+        vitamin_a_mcg: t.total_vitamin_a_mcg || 0,
+        vitamin_c_mg: t.total_vitamin_c_mg || 0,
+        vitamin_d_mcg: t.total_vitamin_d_mcg || 0,
+        vitamin_b12_mcg: t.total_vitamin_b12_mcg || 0,
+        iron_mg: t.total_iron_mg || 0,
+        calcium_mg: t.total_calcium_mg || 0,
+        potassium_mg: t.total_potassium_mg || 0,
+        magnesium_mg: t.total_magnesium_mg || 0,
+      }
+    }
+    if (activeTab === 'week' && stats?.this_week) {
+      const w = stats.this_week
+      return {
+        vitamin_a_mcg: w.avg_daily_vitamin_a_mcg || 0,
+        vitamin_c_mg: w.avg_daily_vitamin_c_mg || 0,
+        vitamin_d_mcg: w.avg_daily_vitamin_d_mcg || 0,
+        vitamin_b12_mcg: w.avg_daily_vitamin_b12_mcg || 0,
+        iron_mg: w.avg_daily_iron_mg || 0,
+        calcium_mg: w.avg_daily_calcium_mg || 0,
+        potassium_mg: w.avg_daily_potassium_mg || 0,
+        magnesium_mg: w.avg_daily_magnesium_mg || 0,
+      }
+    }
+    if (activeTab === 'month' && stats?.this_month) {
+      const m = stats.this_month
+      return {
+        vitamin_a_mcg: m.avg_daily_vitamin_a_mcg || 0,
+        vitamin_c_mg: m.avg_daily_vitamin_c_mg || 0,
+        vitamin_d_mcg: m.avg_daily_vitamin_d_mcg || 0,
+        vitamin_b12_mcg: m.avg_daily_vitamin_b12_mcg || 0,
+        iron_mg: m.avg_daily_iron_mg || 0,
+        calcium_mg: m.avg_daily_calcium_mg || 0,
+        potassium_mg: m.avg_daily_potassium_mg || 0,
+        magnesium_mg: m.avg_daily_magnesium_mg || 0,
+      }
+    }
+    return null
+  }
+  const vitaminData = getVitaminData()
+
   // Protein per kg: use week avg protein / latest weight
   const latestWeightKg = stats?.latest_weight_kg
   const proteinPerKg = latestWeightKg && macroData
@@ -335,6 +380,9 @@ export default function StatsView() {
       {macroData && (macroData.protein + macroData.carbs + macroData.fat) > 0 && (
         <MacroRatioChart protein={macroData.protein} carbs={macroData.carbs} fat={macroData.fat} />
       )}
+
+      {/* ── VITAMINS & MINERALS ── */}
+      {vitaminData && <VitaminSection vitamins={vitaminData} />}
 
       {/* ── PROTEIN PER KG (all tabs when weight logged) ── */}
       {macroData && (
@@ -707,6 +755,62 @@ function DietHealth({ data, loading, error }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Daily recommended values for reference
+const VITAMIN_RDI = {
+  vitamin_a_mcg:   { label: 'Vitamin A', unit: 'mcg', rdi: 900,  color: 'bg-orange-100 text-orange-700' },
+  vitamin_c_mg:    { label: 'Vitamin C', unit: 'mg',  rdi: 90,   color: 'bg-yellow-100 text-yellow-700' },
+  vitamin_d_mcg:   { label: 'Vitamin D', unit: 'mcg', rdi: 15,   color: 'bg-yellow-100 text-yellow-700' },
+  vitamin_b12_mcg: { label: 'Vitamin B12', unit: 'mcg', rdi: 2.4, color: 'bg-cyan-100 text-cyan-700' },
+  iron_mg:         { label: 'Iron',      unit: 'mg',  rdi: 12,   color: 'bg-red-100 text-red-700' },
+  calcium_mg:      { label: 'Calcium',   unit: 'mg',  rdi: 1000, color: 'bg-sky-100 text-sky-700' },
+  potassium_mg:    { label: 'Potassium', unit: 'mg',  rdi: 3500, color: 'bg-lime-100 text-lime-700' },
+  magnesium_mg:    { label: 'Magnesium', unit: 'mg',  rdi: 400,  color: 'bg-teal-100 text-teal-700' },
+}
+
+function VitaminSection({ vitamins }) {
+  const hasAny = Object.keys(VITAMIN_RDI).some(k => (vitamins?.[k] || 0) > 0)
+  if (!hasAny) return null
+
+  return (
+    <div className="card mt-6">
+      <h3 className="text-lg font-semibold text-gray-800 mb-1">Vitamins &amp; Minerals</h3>
+      <p className="text-xs text-gray-400 mb-4">AI estimates based on logged foods — use as a rough guide</p>
+      <div className="space-y-3">
+        {Object.entries(VITAMIN_RDI).map(([key, { label, unit, rdi, color }]) => {
+          const value = vitamins?.[key] || 0
+          const pct = Math.min(Math.round((value / rdi) * 100), 100)
+          const over = Math.round((value / rdi) * 100) > 100
+          const status = pct >= 80 ? 'good' : pct >= 40 ? 'moderate' : 'low'
+          const barColor = status === 'good' ? 'bg-green-400' : status === 'moderate' ? 'bg-amber-400' : 'bg-red-400'
+          return (
+            <div key={key}>
+              <div className="flex justify-between items-baseline mb-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${color}`}>{label}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-semibold text-gray-700">
+                    {value % 1 === 0 ? value : value.toFixed(1)}{unit}
+                  </span>
+                  <span className="text-xs text-gray-400 ml-1">/ {rdi}{unit}</span>
+                  {over && <span className="text-xs text-green-500 ml-1">✓</span>}
+                </div>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${barColor}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <p className="text-xs text-gray-300 mt-4">RDI = Reference Daily Intake for an average adult</p>
     </div>
   )
 }

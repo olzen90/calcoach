@@ -524,6 +524,29 @@ export default function CoachChat({ feed, meals, onRefresh }) {
               </div>
             ))}
           </div>
+          {/* Vitamin summary for the whole meal */}
+          {(() => {
+            const vitaminBadges = [
+              meal.vitamin_a_mcg > 0 && { label: `Vit A ${Math.round(meal.vitamin_a_mcg)}mcg`, color: 'bg-orange-100 text-orange-600' },
+              meal.vitamin_c_mg > 0 && { label: `Vit C ${Math.round(meal.vitamin_c_mg)}mg`, color: 'bg-yellow-100 text-yellow-700' },
+              meal.vitamin_d_mcg > 0 && { label: `Vit D ${meal.vitamin_d_mcg}mcg`, color: 'bg-yellow-100 text-yellow-700' },
+              meal.vitamin_b12_mcg > 0 && { label: `B12 ${meal.vitamin_b12_mcg}mcg`, color: 'bg-cyan-100 text-cyan-700' },
+              meal.iron_mg > 0 && { label: `Iron ${meal.iron_mg}mg`, color: 'bg-red-100 text-red-600' },
+              meal.calcium_mg > 0 && { label: `Ca ${Math.round(meal.calcium_mg)}mg`, color: 'bg-sky-100 text-sky-700' },
+              meal.potassium_mg > 0 && { label: `K ${Math.round(meal.potassium_mg)}mg`, color: 'bg-lime-100 text-lime-700' },
+              meal.magnesium_mg > 0 && { label: `Mg ${Math.round(meal.magnesium_mg)}mg`, color: 'bg-teal-100 text-teal-700' },
+            ].filter(Boolean)
+            return vitaminBadges.length > 0 ? (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-400 mb-1.5">Vitamins &amp; minerals</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {vitaminBadges.map((b, i) => (
+                    <span key={i} className={`px-1.5 py-0.5 rounded text-xs ${b.color}`}>{b.label}</span>
+                  ))}
+                </div>
+              </div>
+            ) : null
+          })()}
         </div>
       )}
     </div>

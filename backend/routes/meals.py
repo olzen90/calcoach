@@ -51,6 +51,14 @@ class MealResponse(BaseModel):
     sugar_g: float = 0
     fiber_g: float = 0
     sodium_mg: float = 0
+    vitamin_a_mcg: float = 0
+    vitamin_c_mg: float = 0
+    vitamin_d_mcg: float = 0
+    vitamin_b12_mcg: float = 0
+    iron_mg: float = 0
+    calcium_mg: float = 0
+    potassium_mg: float = 0
+    magnesium_mg: float = 0
     emoji: Optional[str] = "🍽️"
     ai_response: Optional[str]
     breakdown: Optional[str] = None  # JSON string with AI's reasoning
@@ -105,7 +113,15 @@ def update_daily_stats(db: Session, user_id: int, meal_date: date):
     total_sugar = sum(m.sugar_g or 0 for m in meals)
     total_fiber = sum(m.fiber_g or 0 for m in meals)
     total_sodium = sum(m.sodium_mg or 0 for m in meals)
-    
+    total_vitamin_a = sum(m.vitamin_a_mcg or 0 for m in meals)
+    total_vitamin_c = sum(m.vitamin_c_mg or 0 for m in meals)
+    total_vitamin_d = sum(m.vitamin_d_mcg or 0 for m in meals)
+    total_vitamin_b12 = sum(m.vitamin_b12_mcg or 0 for m in meals)
+    total_iron = sum(m.iron_mg or 0 for m in meals)
+    total_calcium = sum(m.calcium_mg or 0 for m in meals)
+    total_potassium = sum(m.potassium_mg or 0 for m in meals)
+    total_magnesium = sum(m.magnesium_mg or 0 for m in meals)
+
     # Get or create daily stats
     stats = db.query(DailyStats).filter(
         DailyStats.user_id == user_id,
@@ -123,6 +139,14 @@ def update_daily_stats(db: Session, user_id: int, meal_date: date):
     stats.total_sugar_g = total_sugar
     stats.total_fiber_g = total_fiber
     stats.total_sodium_mg = total_sodium
+    stats.total_vitamin_a_mcg = total_vitamin_a
+    stats.total_vitamin_c_mg = total_vitamin_c
+    stats.total_vitamin_d_mcg = total_vitamin_d
+    stats.total_vitamin_b12_mcg = total_vitamin_b12
+    stats.total_iron_mg = total_iron
+    stats.total_calcium_mg = total_calcium
+    stats.total_potassium_mg = total_potassium
+    stats.total_magnesium_mg = total_magnesium
     
     # Check streak conditions
     user = db.query(User).filter(User.id == user_id).first()
@@ -659,6 +683,14 @@ async def analyze_and_log_meal(
             sugar_g=analysis.get("sugar_g", 0),
             fiber_g=analysis.get("fiber_g", 0),
             sodium_mg=analysis.get("sodium_mg", 0),
+            vitamin_a_mcg=analysis.get("vitamin_a_mcg", 0),
+            vitamin_c_mg=analysis.get("vitamin_c_mg", 0),
+            vitamin_d_mcg=analysis.get("vitamin_d_mcg", 0),
+            vitamin_b12_mcg=analysis.get("vitamin_b12_mcg", 0),
+            iron_mg=analysis.get("iron_mg", 0),
+            calcium_mg=analysis.get("calcium_mg", 0),
+            potassium_mg=analysis.get("potassium_mg", 0),
+            magnesium_mg=analysis.get("magnesium_mg", 0),
             emoji=analysis.get("emoji", "🍽️"),
             ai_response=str(analysis),
             breakdown=breakdown_json
