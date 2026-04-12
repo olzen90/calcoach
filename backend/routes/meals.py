@@ -223,12 +223,15 @@ async def analyze_and_log_meal(
     image: Optional[UploadFile] = File(None),
     preview: bool = Form(False),
     local_time: Optional[str] = Form(None),
+    confirmed_analysis: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """Analyze food with AI and optionally log the meal.
     
     If preview=true, only returns the analysis without saving to database.
     local_time: User's local time in HH:MM format (from browser).
+    confirmed_analysis: JSON string of a previous analysis result; if provided,
+        skips the AI call and saves using this data directly.
     """
     user = get_user(db)
 
@@ -298,22 +301,30 @@ async def analyze_and_log_meal(
         'fat_g': sum(m['fat_g'] for m in todays_meals),
     }
     
-    # Analyze with AI
-    try:
-        analysis = await analyze_food(
-            description=description,
-            image_path=image_path,
-            base_prompt=user.base_prompt,
-            calorie_goal=user.daily_calorie_goal,
-            protein_goal=user.protein_goal_g,
-            carbs_goal=user.carbs_goal_g,
-            fat_goal=user.fat_goal_g,
-            favorites=favorites,
-            todays_meals=todays_meals,
-            todays_totals=todays_totals
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
+    # Use confirmed analysis if provided (user already saw and approved the preview),
+    # otherwise call the AI so we don't get a different estimate on the second call.
+    if confirmed_analysis:
+        try:
+            analysis = json.loads(confirmed_analysis)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid confirmed_analysis JSON")
+    else:
+        # Analyze with AI
+        try:
+            analysis = await analyze_food(
+                description=description,
+                image_path=image_path,
+                base_prompt=user.base_prompt,
+                calorie_goal=user.daily_calorie_goal,
+                protein_goal=user.protein_goal_g,
+                carbs_goal=user.carbs_goal_g,
+                fat_goal=user.fat_goal_g,
+                favorites=favorites,
+                todays_meals=todays_meals,
+                todays_totals=todays_totals
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
     
     entry_type = analysis.get("entry_type", "meal")
     

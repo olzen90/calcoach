@@ -219,7 +219,9 @@ export default function CoachView() {
               budgetRemaining: Math.max(0, remaining),
               // Store input state for re-submission
               savedInput: input,
-              savedImage: image
+              savedImage: image,
+              // Store the full analysis so we can save it directly on confirm
+              confirmedAnalysis: preview.analysis
             })
             return
           }
@@ -291,7 +293,8 @@ export default function CoachView() {
     }
     setOverBudgetWarning(null)
     
-    // Create new FormData and submit directly
+    // Create new FormData and submit directly, passing the already-analyzed data
+    // to avoid a second AI call that could return different calorie estimates
     const formData = new FormData()
     formData.append('description', overBudgetWarning.savedInput || 'Food from image')
     if (overBudgetWarning.savedImage) {
@@ -301,6 +304,9 @@ export default function CoachView() {
     const now = new Date()
     const localTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     formData.append('local_time', localTime)
+    if (overBudgetWarning.confirmedAnalysis) {
+      formData.append('confirmed_analysis', JSON.stringify(overBudgetWarning.confirmedAnalysis))
+    }
     
     try {
       const result = await uploadFile('/meals/analyze', formData)
