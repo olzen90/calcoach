@@ -31,6 +31,7 @@ class GoalSettings(BaseModel):
 
 class AISettings(BaseModel):
     base_prompt: Optional[str]
+    voice_language: Optional[str] = None
 
 
 class TDEECalculation(BaseModel):
@@ -69,6 +70,7 @@ class FullSettings(BaseModel):
     fiber_goal_g: int = 30
     sodium_goal_mg: int = 2300
     base_prompt: Optional[str]
+    voice_language: str = "en-US"
     created_at: datetime
 
     class Config:
@@ -109,6 +111,7 @@ async def get_settings(db: Session = Depends(get_db)):
         "fiber_goal_g": user.fiber_goal_g or 30,
         "sodium_goal_mg": user.sodium_goal_mg or 2300,
         "base_prompt": user.base_prompt,
+        "voice_language": user.voice_language or "en-US",
         "created_at": user.created_at,
     }
     return FullSettings(**user_dict)
@@ -163,6 +166,8 @@ async def update_ai_settings(settings: AISettings, db: Session = Depends(get_db)
 
     if settings.base_prompt is not None:
         user.base_prompt = settings.base_prompt
+    if settings.voice_language is not None:
+        user.voice_language = settings.voice_language
 
     db.commit()
     db.refresh(user)

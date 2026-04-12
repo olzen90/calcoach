@@ -39,6 +39,7 @@ class User(Base):
     sodium_goal_mg = Column(Integer, default=2300)
     openai_api_key = Column(String(200))
     base_prompt = Column(Text, default="""You are a helpful and encouraging nutrition coach. When analyzing food, be supportive and give helpful tips in your notes. Be encouraging and supportive!""")
+    voice_language = Column(String(10), default="en-US")
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -314,4 +315,12 @@ def run_migrations():
             
             if 'emoji' not in columns:
                 conn.execute(text('ALTER TABLE meal_templates ADD COLUMN emoji VARCHAR(10)'))
+                conn.commit()
+
+        # Check users table for new columns
+        if 'users' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('users')]
+
+            if 'voice_language' not in columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN voice_language VARCHAR(10) DEFAULT 'en-US'"))
                 conn.commit()

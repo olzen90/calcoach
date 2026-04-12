@@ -175,6 +175,69 @@ export function useCustomRangeStats() {
 }
 
 /**
+ * Hook for fetching food frequency data
+ */
+export function useFoodFrequency() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const fetch_ = useCallback(async (period, startDate = null, endDate = null) => {
+    setLoading(true)
+    try {
+      let url = `${API_BASE}/stats/food-frequency?period=${period}`
+      if (startDate && endDate) {
+        url += `&start_date=${startDate}&end_date=${endDate}`
+      }
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('Failed to fetch food frequency')
+      const result = await response.json()
+      setData(result)
+      setError(null)
+      return result
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { data, loading, error, fetch: fetch_ }
+}
+
+/**
+ * Hook for AI health assessment
+ */
+export function useHealthAssessment() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const fetch_ = useCallback(async (period, startDate = null, endDate = null) => {
+    setLoading(true)
+    setData(null)
+    try {
+      let url = `${API_BASE}/stats/health-assessment?period=${period}`
+      if (startDate && endDate) {
+        url += `&start_date=${startDate}&end_date=${endDate}`
+      }
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('Failed to fetch health assessment')
+      const result = await response.json()
+      setData(result)
+      setError(null)
+      return result
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { data, loading, error, fetch: fetch_ }
+}
+
+/**
  * Hook for fetching settings
  */
 export function useSettings() {

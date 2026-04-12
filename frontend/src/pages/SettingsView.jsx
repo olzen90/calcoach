@@ -47,9 +47,7 @@ export default function SettingsView() {
   const [newExercise, setNewExercise] = useState('')
   const [storage, setStorage] = useState(null)
   const [favorites, setFavorites] = useState([])
-  const [voiceLanguage, setVoiceLanguage] = useState(() => 
-    localStorage.getItem('voice_language') || 'en-US'
-  )
+  const [voiceLanguage, setVoiceLanguage] = useState('en-US')
   const [showAddFavorite, setShowAddFavorite] = useState(false)
   const [newFavorite, setNewFavorite] = useState({
     name: '',
@@ -108,6 +106,7 @@ export default function SettingsView() {
       setAiSettings({
         base_prompt: settings.base_prompt || ''
       })
+      setVoiceLanguage(settings.voice_language || 'en-US')
     }
   }, [settings])
   
@@ -428,10 +427,15 @@ export default function SettingsView() {
               <label className="block text-sm text-gray-500 mb-1">Voice Language</label>
               <select
                 value={voiceLanguage}
-                onChange={(e) => {
-                  setVoiceLanguage(e.target.value)
-                  localStorage.setItem('voice_language', e.target.value)
-                  showMessage('Voice language updated!')
+                onChange={async (e) => {
+                  const lang = e.target.value
+                  setVoiceLanguage(lang)
+                  try {
+                    await put('/settings/ai', { voice_language: lang })
+                    showMessage('Voice language updated!')
+                  } catch {
+                    showMessage('Failed to save voice language')
+                  }
                 }}
                 className="input-field"
               >

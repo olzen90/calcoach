@@ -24,9 +24,7 @@ export default function CoachView() {
   const [lastEntry, setLastEntry] = useState(null)
   const [showMacros, setShowMacros] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
-  const [voiceLanguage, setVoiceLanguage] = useState(() => 
-    localStorage.getItem('voice_language') || 'en-US'
-  )
+  const [voiceLanguage, setVoiceLanguage] = useState('en-US')
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [pendingAction, setPendingAction] = useState(null)
   const [overBudgetWarning, setOverBudgetWarning] = useState(null) // { meal, calories, budgetRemaining }
@@ -64,6 +62,13 @@ export default function CoachView() {
       } catch (err) {
         console.error('Failed to load coach data:', err)
         refresh()
+      }
+      // Load voice language from settings
+      try {
+        const settings = await get('/settings/')
+        if (settings.voice_language) setVoiceLanguage(settings.voice_language)
+      } catch {
+        // fall back to default
       }
     }
     init()
@@ -114,30 +119,6 @@ export default function CoachView() {
     
     executeAction()
   }, [pendingAction, loading])
-  
-  // Listen for voice language changes from Settings
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const newLang = localStorage.getItem('voice_language') || 'en-US'
-      setVoiceLanguage(newLang)
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    
-    // Also check on focus (for same-tab navigation)
-    const handleFocus = () => {
-      const newLang = localStorage.getItem('voice_language') || 'en-US'
-      if (newLang !== voiceLanguage) {
-        setVoiceLanguage(newLang)
-      }
-    }
-    window.addEventListener('focus', handleFocus)
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [voiceLanguage])
   
   // Detect keyboard opening on mobile (especially Android) using visualViewport API
   useEffect(() => {

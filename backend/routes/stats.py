@@ -1,11 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, List
 from datetime import date, datetime, timedelta
+import json
+import os
+import openai
+from collections import defaultdict
 from pydantic import BaseModel
 
-from database import get_db, User, MealEntry, DailyStats, StreakStatus
+from database import get_db, User, MealEntry, DailyStats, StreakStatus, WeightLog
+from services.openai_service import get_food_emoji
+
+# Simple in-memory cache for health assessments: key -> result
+_assessment_cache: dict = {}
 
 router = APIRouter()
 
@@ -35,6 +43,10 @@ class WeeklySummary(BaseModel):
     avg_daily_calories: float
     total_protein_g: float
     avg_daily_protein_g: float
+    total_carbs_g: float = 0
+    avg_daily_carbs_g: float = 0
+    total_fat_g: float = 0
+    avg_daily_fat_g: float = 0
     total_sugar_g: float = 0
     avg_daily_sugar_g: float = 0
     total_fiber_g: float = 0
@@ -44,6 +56,9 @@ class WeeklySummary(BaseModel):
     days_tracked: int
     days_on_goal: int
     calorie_goal_weekly: int
+    protein_goal_g: int = 150
+    carbs_goal_g: int = 250
+    fat_goal_g: int = 65
     sugar_goal_g: int = 50
     fiber_goal_g: int = 30
     sodium_goal_mg: int = 2300
@@ -56,6 +71,10 @@ class MonthlySummary(BaseModel):
     avg_daily_calories: float
     total_protein_g: float
     avg_daily_protein_g: float
+    total_carbs_g: float = 0
+    avg_daily_carbs_g: float = 0
+    total_fat_g: float = 0
+    avg_daily_fat_g: float = 0
     total_sugar_g: float = 0
     avg_daily_sugar_g: float = 0
     total_fiber_g: float = 0
@@ -64,6 +83,9 @@ class MonthlySummary(BaseModel):
     avg_daily_sodium_mg: float = 0
     days_tracked: int
     days_on_goal: int
+    protein_goal_g: int = 150
+    carbs_goal_g: int = 250
+    fat_goal_g: int = 65
     sugar_goal_g: int = 50
     fiber_goal_g: int = 30
     sodium_goal_mg: int = 2300
@@ -120,6 +142,8 @@ class FullStats(BaseModel):
     hunger_patterns: Optional[HungerPattern]
     daily_history: List[DailySummary]
     weekly_trajectory: Optional[dict] = None
+    latest_weight_kg: Optional[float] = None
+    protein_per_kg: Optional[float] = None
 
 
 def get_user(db: Session) -> User:
@@ -195,6 +219,8 @@ async def get_week_stats(
     
     total_calories = sum(m.calories or 0 for m in meals)
     total_protein = sum(m.protein_g or 0 for m in meals)
+    total_carbs = sum(m.carbs_g or 0 for m in meals)
+    total_fat = sum(m.fat_g or 0 for m in meals)
     total_sugar = sum(m.sugar_g or 0 for m in meals)
     total_fiber = sum(m.fiber_g or 0 for m in meals)
     total_sodium = sum(m.sodium_mg or 0 for m in meals)
@@ -211,11 +237,14 @@ async def get_week_stats(
         if day_calories <= (user.daily_calorie_goal * 1.1):
             days_on_goal += 1
     
-    avg_daily = total_calories // max(days_tracked, 1)
-    avg_protein = total_protein // max(days_tracked, 1)
-    avg_sugar = total_sugar // max(days_tracked, 1)
-    avg_fiber = total_fiber // max(days_tracked, 1)
-    avg_sodium = total_sodium // max(days_tracked, 1)
+    denom = max(days_tracked, 1)
+    avg_daily = total_calories // denom
+    avg_protein = total_protein // denom
+    avg_carbs = total_carbs // denom
+    avg_fat = total_fat // denom
+    avg_sugar = total_sugar // denom
+    avg_fiber = total_fiber // denom
+    avg_sodium = total_sodium // denom
     
     return WeeklySummary(
         week_start=week_start,
@@ -224,6 +253,10 @@ async def get_week_stats(
         avg_daily_calories=avg_daily,
         total_protein_g=total_protein,
         avg_daily_protein_g=avg_protein,
+        total_carbs_g=total_carbs,
+        avg_daily_carbs_g=avg_carbs,
+        total_fat_g=total_fat,
+        avg_daily_fat_g=avg_fat,
         total_sugar_g=total_sugar,
         avg_daily_sugar_g=avg_sugar,
         total_fiber_g=total_fiber,
@@ -233,6 +266,9 @@ async def get_week_stats(
         days_tracked=days_tracked,
         days_on_goal=days_on_goal,
         calorie_goal_weekly=user.daily_calorie_goal * 7,
+        protein_goal_g=user.protein_goal_g,
+        carbs_goal_g=user.carbs_goal_g,
+        fat_goal_g=user.fat_goal_g,
         sugar_goal_g=user.sugar_goal_g,
         fiber_goal_g=user.fiber_goal_g,
         sodium_goal_mg=user.sodium_goal_mg
@@ -272,6 +308,8 @@ async def get_month_stats(
     
     total_calories = sum(m.calories or 0 for m in meals)
     total_protein = sum(m.protein_g or 0 for m in meals)
+    total_carbs = sum(m.carbs_g or 0 for m in meals)
+    total_fat = sum(m.fat_g or 0 for m in meals)
     total_sugar = sum(m.sugar_g or 0 for m in meals)
     total_fiber = sum(m.fiber_g or 0 for m in meals)
     total_sodium = sum(m.sodium_mg or 0 for m in meals)
@@ -286,11 +324,14 @@ async def get_month_stats(
         if day_calories <= (user.daily_calorie_goal * 1.1):
             days_on_goal += 1
     
-    avg_daily = total_calories // max(days_tracked, 1)
-    avg_protein = total_protein // max(days_tracked, 1)
-    avg_sugar = total_sugar // max(days_tracked, 1)
-    avg_fiber = total_fiber // max(days_tracked, 1)
-    avg_sodium = total_sodium // max(days_tracked, 1)
+    denom = max(days_tracked, 1)
+    avg_daily = total_calories // denom
+    avg_protein = total_protein // denom
+    avg_carbs = total_carbs // denom
+    avg_fat = total_fat // denom
+    avg_sugar = total_sugar // denom
+    avg_fiber = total_fiber // denom
+    avg_sodium = total_sodium // denom
     
     return MonthlySummary(
         month=month_start.strftime("%B"),
@@ -299,6 +340,10 @@ async def get_month_stats(
         avg_daily_calories=avg_daily,
         total_protein_g=total_protein,
         avg_daily_protein_g=avg_protein,
+        total_carbs_g=total_carbs,
+        avg_daily_carbs_g=avg_carbs,
+        total_fat_g=total_fat,
+        avg_daily_fat_g=avg_fat,
         total_sugar_g=total_sugar,
         avg_daily_sugar_g=avg_sugar,
         total_fiber_g=total_fiber,
@@ -307,6 +352,9 @@ async def get_month_stats(
         avg_daily_sodium_mg=avg_sodium,
         days_tracked=days_tracked,
         days_on_goal=days_on_goal,
+        protein_goal_g=user.protein_goal_g,
+        carbs_goal_g=user.carbs_goal_g,
+        fat_goal_g=user.fat_goal_g,
         sugar_goal_g=user.sugar_goal_g,
         fiber_goal_g=user.fiber_goal_g,
         sodium_goal_mg=user.sodium_goal_mg
@@ -756,6 +804,7 @@ async def get_weekly_trajectory(db: Session = Depends(get_db)):
 @router.get("/full", response_model=FullStats)
 async def get_full_stats(db: Session = Depends(get_db)):
     """Get all statistics in one call, including weekly trajectory."""
+    user = get_user(db)
     today_stats = await get_today_stats(db)
     week_stats = await get_week_stats(0, db)
     month_stats = await get_month_stats(0, db)
@@ -763,7 +812,20 @@ async def get_full_stats(db: Session = Depends(get_db)):
     hunger_patterns = await get_hunger_patterns(30, db)
     daily_history = await get_daily_history(7, db)
     trajectory = await get_weekly_trajectory(db)
-    
+
+    # Latest weight for protein/kg calculation
+    latest_weight = (
+        db.query(WeightLog)
+        .filter(WeightLog.user_id == user.id)
+        .order_by(WeightLog.date.desc())
+        .first()
+    )
+    latest_weight_kg = latest_weight.weight_kg if latest_weight else None
+    protein_per_kg = (
+        round(week_stats.avg_daily_protein_g / latest_weight_kg, 2)
+        if latest_weight_kg and latest_weight_kg > 0 else None
+    )
+
     return FullStats(
         today=today_stats,
         this_week=week_stats,
@@ -771,5 +833,236 @@ async def get_full_stats(db: Session = Depends(get_db)):
         streaks=streak_info,
         hunger_patterns=hunger_patterns,
         daily_history=daily_history,
-        weekly_trajectory=trajectory
+        weekly_trajectory=trajectory,
+        latest_weight_kg=latest_weight_kg,
+        protein_per_kg=protein_per_kg
     )
+
+
+def _get_period_dates(period: str, start_date: Optional[date], end_date: Optional[date]) -> tuple[date, date]:
+    """Return (start, end) for the given period string."""
+    today = date.today()
+    if period == "today":
+        return today, today
+    elif period == "week":
+        week_start, week_end = get_week_dates(today)
+        return week_start, week_end
+    elif period == "month":
+        month_start = date(today.year, today.month, 1)
+        if today.month == 12:
+            month_end = date(today.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            month_end = date(today.year, today.month + 1, 1) - timedelta(days=1)
+        return month_start, month_end
+    elif period == "custom":
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="start_date and end_date required for custom period")
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+        return start_date, end_date
+    else:
+        raise HTTPException(status_code=400, detail="period must be today, week, month, or custom")
+
+
+@router.get("/food-frequency")
+async def get_food_frequency(
+    period: str = Query("week", regex="^(today|week|month|custom)$"),
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """Get most frequently eaten foods for the period, split into keep_eating / eat_less."""
+    user = get_user(db)
+    p_start, p_end = _get_period_dates(period, start_date, end_date)
+
+    meals = db.query(MealEntry).filter(
+        MealEntry.user_id == user.id,
+        MealEntry.date >= p_start,
+        MealEntry.date <= p_end
+    ).all()
+
+    # Aggregate per food item from breakdowns
+    food_stats: dict[str, dict] = {}
+    for meal in meals:
+        if not meal.breakdown:
+            continue
+        try:
+            items = json.loads(meal.breakdown)
+        except Exception:
+            continue
+        for item in items:
+            name = item.get("item", "").strip().lower()
+            if not name or len(name) < 2:
+                continue
+            if name not in food_stats:
+                food_stats[name] = {
+                    "name": item.get("item", "").strip(),
+                    "count": 0,
+                    "total_calories": 0,
+                    "total_protein_g": 0,
+                    "total_sugar_g": 0,
+                    "total_fat_g": 0,
+                    "total_fiber_g": 0,
+                    "total_sodium_mg": 0,
+                }
+            s = food_stats[name]
+            s["count"] += 1
+            s["total_calories"] += item.get("calories", 0) or 0
+            s["total_protein_g"] += item.get("protein_g", 0) or 0
+            s["total_sugar_g"] += item.get("sugar_g", 0) or 0
+            s["total_fat_g"] += item.get("fat_g", 0) or 0
+            s["total_fiber_g"] += item.get("fiber_g", 0) or 0
+            s["total_sodium_mg"] += item.get("sodium_mg", 0) or 0
+
+    unique_food_count = len(food_stats)
+
+    # Classify each food
+    keep_eating = []
+    eat_less = []
+
+    for key, s in food_stats.items():
+        cnt = s["count"]
+        avg_cal = s["total_calories"] / cnt
+        avg_protein = s["total_protein_g"] / cnt
+        avg_sugar = s["total_sugar_g"] / cnt
+        avg_fat = s["total_fat_g"] / cnt
+        avg_fiber = s["total_fiber_g"] / cnt
+        avg_sodium = s["total_sodium_mg"] / cnt
+
+        entry = {
+            "name": s["name"],
+            "count": cnt,
+            "avg_calories": round(avg_cal),
+            "avg_protein_g": round(avg_protein, 1),
+            "avg_sugar_g": round(avg_sugar, 1),
+            "avg_fat_g": round(avg_fat, 1),
+            "avg_fiber_g": round(avg_fiber, 1),
+            "avg_sodium_mg": round(avg_sodium),
+            "emoji": get_food_emoji(s["name"]),
+        }
+
+        # Heuristic: unhealthy if high sugar OR high sodium OR fat >> protein and high cal
+        is_unhealthy = (
+            avg_sugar > 12
+            or avg_sodium > 600
+            or (avg_fat > 15 and avg_protein < 8 and avg_cal > 200)
+        )
+        # Healthy bonus: high protein or high fiber
+        is_healthy = avg_protein >= 10 or avg_fiber >= 3
+
+        if is_unhealthy and not is_healthy:
+            eat_less.append(entry)
+        else:
+            keep_eating.append(entry)
+
+    keep_eating.sort(key=lambda x: x["count"], reverse=True)
+    eat_less.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "keep_eating": keep_eating[:6],
+        "eat_less": eat_less[:6],
+        "unique_food_count": unique_food_count,
+        "period": period,
+        "start_date": p_start.isoformat(),
+        "end_date": p_end.isoformat(),
+    }
+
+
+@router.get("/health-assessment")
+async def get_health_assessment(
+    period: str = Query("week", regex="^(week|month|custom)$"),
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """AI-generated diet health assessment for the given period."""
+    user = get_user(db)
+    p_start, p_end = _get_period_dates(period, start_date, end_date)
+
+    # Cache key to avoid redundant API calls
+    cache_key = f"{user.id}:{period}:{p_start}:{p_end}"
+    if cache_key in _assessment_cache:
+        return _assessment_cache[cache_key]
+
+    meals = db.query(MealEntry).filter(
+        MealEntry.user_id == user.id,
+        MealEntry.date >= p_start,
+        MealEntry.date <= p_end
+    ).all()
+
+    if not meals:
+        return {
+            "status": "no_data",
+            "summary": "No meals logged for this period.",
+            "strengths": [],
+            "improvements": [],
+            "micronutrient_flags": [],
+        }
+
+    # Build summary for the prompt
+    total_days = max((p_end - p_start).days + 1, 1)
+    tracked_days = len(set(m.date for m in meals))
+    total_cal = sum(m.calories or 0 for m in meals)
+    total_protein = sum(m.protein_g or 0 for m in meals)
+    total_carbs = sum(m.carbs_g or 0 for m in meals)
+    total_fat = sum(m.fat_g or 0 for m in meals)
+    total_sugar = sum(m.sugar_g or 0 for m in meals)
+    total_fiber = sum(m.fiber_g or 0 for m in meals)
+    total_sodium = sum(m.sodium_mg or 0 for m in meals)
+    denom = max(tracked_days, 1)
+
+    food_names = [m.description for m in meals if m.description]
+    breakdown_items = []
+    for m in meals:
+        if m.breakdown:
+            try:
+                breakdown_items.extend([i.get("item", "") for i in json.loads(m.breakdown) if i.get("item")])
+            except Exception:
+                pass
+
+    prompt = f"""You are a nutrition expert analyzing a user's diet for the period {p_start} to {p_end} ({tracked_days} tracked days out of {total_days}).
+
+User goals: {user.daily_calorie_goal} kcal/day, {user.protein_goal_g}g protein, {user.carbs_goal_g}g carbs, {user.fat_goal_g}g fat, max {user.sugar_goal_g}g sugar, {user.fiber_goal_g}g fiber, max {user.sodium_goal_mg}mg sodium.
+
+Average daily intake:
+- Calories: {total_cal // denom} kcal (goal: {user.daily_calorie_goal})
+- Protein: {total_protein // denom}g (goal: {user.protein_goal_g}g)
+- Carbs: {total_carbs // denom}g (goal: {user.carbs_goal_g}g)
+- Fat: {total_fat // denom}g (goal: {user.fat_goal_g}g)
+- Sugar: {total_sugar // denom}g (limit: {user.sugar_goal_g}g)
+- Fiber: {total_fiber // denom}g (goal: {user.fiber_goal_g}g)
+- Sodium: {total_sodium // denom}mg (limit: {user.sodium_goal_mg}mg)
+
+Foods eaten: {', '.join(set(breakdown_items[:80]))}
+
+Provide a concise, actionable diet assessment. Respond ONLY with this exact JSON structure:
+{{
+  "status": "on_track" | "needs_attention" | "off_track",
+  "summary": "1-2 sentence overall assessment",
+  "strengths": ["strength 1", "strength 2"],
+  "improvements": ["specific actionable suggestion 1", "specific actionable suggestion 2"],
+  "micronutrient_flags": [
+    {{"nutrient": "Vitamin D", "concern": "low" | "moderate", "suggestion": "Add fatty fish or fortified dairy"}}
+  ]
+}}
+Keep strengths and improvements to 2-3 items each. Only include micronutrient_flags if there are genuine concerns (0-3 items)."""
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    client = openai.OpenAI(api_key=api_key)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            max_tokens=800,
+        )
+        result = json.loads(response.choices[0].message.content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI assessment failed: {str(e)}")
+
+    # Cache result for this session
+    _assessment_cache[cache_key] = result
+    return result
