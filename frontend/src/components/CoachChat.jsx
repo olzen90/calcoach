@@ -302,7 +302,6 @@ export default function CoachChat({ feed, meals, onRefresh }) {
   // Render a meal card
   const renderMealCard = (meal, key) => {
     const breakdown = parseBreakdown(meal.breakdown)
-    const showDetails = breakdown && breakdown.length > 1
     
     // Use the meal's stored values (breakdown should match these totals)
     const totals = meal
@@ -473,58 +472,41 @@ export default function CoachChat({ feed, meals, onRefresh }) {
               <span className="macro-badge protein">{formatMacro(totals.protein_g)}g protein</span>
               <span className="macro-badge carbs">{formatMacro(totals.carbs_g)}g carbs</span>
               <span className="macro-badge fat">{formatMacro(totals.fat_g)}g fat</span>
-              <span className="macro-badge sugar">{formatMacro(totals.sugar_g)}g sugar</span>
-              <span className="macro-badge fiber">{formatMacro(totals.fiber_g)}g fiber</span>
-              <span className="macro-badge sodium">{formatSodiumG(totals.sodium_mg)}g sodium</span>
             </div>
           )}
-          
-          {/* Details button */}
-          {showDetails && (
-            <div className="mt-2">
-              <button
-                onClick={() => setExpandedDetails(expandedDetails === meal.id ? null : meal.id)}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                {expandedDetails === meal.id ? (
-                  <ChevronUp className="w-3 h-3" />
-                ) : (
-                  <ChevronDown className="w-3 h-3" />
-                )}
-                <span>Details</span>
-              </button>
-            </div>
-          )}
+
+          {/* Details toggle — always visible */}
+          <div className="mt-2">
+            <button
+              onClick={() => setExpandedDetails(expandedDetails === meal.id ? null : meal.id)}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              {expandedDetails === meal.id ? (
+                <ChevronUp className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+              <span>Details</span>
+            </button>
+          </div>
         </div>
       </div>
       
       {/* Expanded details */}
-      {showDetails && expandedDetails === meal.id && breakdown && (
-        <div className="mt-2 text-xs bg-gray-50 rounded-lg p-3">
-          <div className="divide-y divide-gray-200">
-            {breakdown.map((item, idx) => (
-              <div key={idx} className="py-3 first:pt-0 last:pb-0">
-                <div className="flex justify-between items-baseline mb-2">
-                  <span className="text-gray-800 font-semibold text-sm">
-                    {item.item}
-                  </span>
-                  <span className="text-gray-400 text-xs ml-2 font-medium">
-                    {item.amount}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 text-xs">
-                  <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-700">{formatMacro(item.calories)} cal</span>
-                  {item.protein_g > 0 && <span className="px-1.5 py-0.5 bg-blue-100 rounded text-blue-600">{formatMacro(item.protein_g)}g protein</span>}
-                  {item.carbs_g > 0 && <span className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-600">{formatMacro(item.carbs_g)}g carbs</span>}
-                  {item.fat_g > 0 && <span className="px-1.5 py-0.5 bg-purple-100 rounded text-purple-600">{formatMacro(item.fat_g)}g fat</span>}
-                  {item.sugar_g > 0 && <span className="px-1.5 py-0.5 bg-pink-100 rounded text-pink-600">{formatMacro(item.sugar_g)}g sugar</span>}
-                  {item.fiber_g > 0 && <span className="px-1.5 py-0.5 bg-green-100 rounded text-green-600">{formatMacro(item.fiber_g)}g fiber</span>}
-                  {item.sodium_mg > 0 && <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">{formatSodiumG(item.sodium_mg)}g sodium</span>}
-                </div>
-              </div>
-            ))}
+      {expandedDetails === meal.id && (
+        <div className="mt-2 text-xs bg-gray-50 rounded-lg p-3 space-y-3">
+
+          {/* Additional macros */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Additional Macros</p>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="macro-badge sugar">{formatMacro(totals.sugar_g)}g sugar</span>
+              <span className="macro-badge fiber">{formatMacro(totals.fiber_g)}g fiber</span>
+              <span className="macro-badge sodium">{formatSodiumG(totals.sodium_mg)}g sodium</span>
+            </div>
           </div>
-          {/* Vitamin summary for the whole meal */}
+
+          {/* Vitamins & minerals */}
           {(() => {
             const vitaminBadges = [
               meal.vitamin_a_mcg > 0 && { label: `Vit A ${Math.round(meal.vitamin_a_mcg)}mcg`, color: 'bg-orange-100 text-orange-600' },
@@ -537,8 +519,8 @@ export default function CoachChat({ feed, meals, onRefresh }) {
               meal.magnesium_mg > 0 && { label: `Mg ${Math.round(meal.magnesium_mg)}mg`, color: 'bg-teal-100 text-teal-700' },
             ].filter(Boolean)
             return vitaminBadges.length > 0 ? (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-400 mb-1.5">Vitamins &amp; minerals</p>
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-1.5">Vitamins &amp; Minerals</p>
                 <div className="flex flex-wrap gap-1.5">
                   {vitaminBadges.map((b, i) => (
                     <span key={i} className={`px-1.5 py-0.5 rounded text-xs ${b.color}`}>{b.label}</span>
@@ -547,6 +529,32 @@ export default function CoachChat({ feed, meals, onRefresh }) {
               </div>
             ) : null
           })()}
+
+          {/* Per-ingredient breakdown — only shown when there are multiple items */}
+          {breakdown && breakdown.length > 1 && (
+            <div className="border-t border-gray-200 pt-3">
+              <p className="text-xs font-medium text-gray-500 mb-2">Breakdown</p>
+              <div className="divide-y divide-gray-200">
+                {breakdown.map((item, idx) => (
+                  <div key={idx} className="py-3 first:pt-0 last:pb-0">
+                    <div className="flex justify-between items-baseline mb-2">
+                      <span className="text-gray-800 font-semibold text-sm">{item.item}</span>
+                      <span className="text-gray-400 text-xs ml-2 font-medium">{item.amount}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-xs">
+                      <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-700">{formatMacro(item.calories)} cal</span>
+                      {item.protein_g > 0 && <span className="px-1.5 py-0.5 bg-blue-100 rounded text-blue-600">{formatMacro(item.protein_g)}g protein</span>}
+                      {item.carbs_g > 0 && <span className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-600">{formatMacro(item.carbs_g)}g carbs</span>}
+                      {item.fat_g > 0 && <span className="px-1.5 py-0.5 bg-purple-100 rounded text-purple-600">{formatMacro(item.fat_g)}g fat</span>}
+                      {item.sugar_g > 0 && <span className="px-1.5 py-0.5 bg-pink-100 rounded text-pink-600">{formatMacro(item.sugar_g)}g sugar</span>}
+                      {item.fiber_g > 0 && <span className="px-1.5 py-0.5 bg-green-100 rounded text-green-600">{formatMacro(item.fiber_g)}g fiber</span>}
+                      {item.sodium_mg > 0 && <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">{formatSodiumG(item.sodium_mg)}g sodium</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
