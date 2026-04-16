@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter, useLocation } from 'react-router-dom'
 import { MessageCircle, BarChart3, TrendingUp, Settings } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import CoachView from './pages/CoachView'
@@ -22,15 +22,36 @@ function NavItem({ to, icon: Icon, label }) {
 }
 
 function AppContent() {
+  const { pathname } = useLocation()
+
   return (
     <div className="min-h-screen">
       <main className="pb-20">
-        <Routes>
-          <Route path="/" element={<CoachView />} />
-          <Route path="/stats" element={<StatsView />} />
-          <Route path="/progress" element={<ProgressView />} />
-          <Route path="/settings" element={<SettingsView />} />
-        </Routes>
+        {/*
+          CoachView mounts/unmounts normally because it renders portals into
+          document.body (floating input bar, toasts). Keeping it mounted while
+          hidden would render those elements over other pages.
+          The JS cache means remounting it is essentially instant.
+        */}
+        {pathname === '/' && <CoachView />}
+
+        {/*
+          Stats, Progress and Settings are kept permanently mounted once the
+          app loads. Navigation between them is a CSS show/hide — no React
+          remount, no useEffect re-run, no API re-fetch.
+          Their useEffects also fire at startup (while the user is on Coach),
+          so by the time the user taps one of these tabs the data is already
+          loaded and ready. Scroll position and active tab state are preserved.
+        */}
+        <div style={pathname !== '/stats' ? { display: 'none' } : undefined}>
+          <StatsView />
+        </div>
+        <div style={pathname !== '/progress' ? { display: 'none' } : undefined}>
+          <ProgressView />
+        </div>
+        <div style={pathname !== '/settings' ? { display: 'none' } : undefined}>
+          <SettingsView />
+        </div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200 safe-bottom z-50">
