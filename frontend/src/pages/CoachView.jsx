@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation } from 'react-router-dom'
 import { Camera, Mic, MicOff, Send, Sparkles, Scale, Ruler, Dumbbell, CheckCircle, ChevronDown, ChevronUp, MessageCircle, Pencil, X, Plus } from 'lucide-react'
 import { useTodayMeals, useApi } from '../hooks/useApi'
 import CalorieRing from '../components/CalorieRing'
@@ -11,9 +11,12 @@ import VoiceInput from '../components/VoiceInput'
 import CameraCapture from '../components/CameraCapture'
 
 export default function CoachView() {
+  const { pathname } = useLocation()
+  const isVisible = pathname === '/'
+
   const [searchParams, setSearchParams] = useSearchParams()
   const { meals, loading, error, refresh, setMeals } = useTodayMeals()
-  const { uploadFile, get, post, loading: submitting } = useApi()
+  const { uploadFile, get, post } = useApi()
   const [feed, setFeed] = useState(null)
   const [weeklyTrajectory, setWeeklyTrajectory] = useState(null)
   
@@ -28,7 +31,7 @@ export default function CoachView() {
   const [voiceLanguage, setVoiceLanguage] = useState('en-US')
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [pendingAction, setPendingAction] = useState(null)
-  const [overBudgetWarning, setOverBudgetWarning] = useState(null) // { meal, calories, budgetRemaining }
+  const [pendingEntries, setPendingEntries] = useState([])
   const [errorMessage, setErrorMessage] = useState(null)
   
   const textareaRef = useRef(null)
@@ -171,179 +174,130 @@ export default function CoachView() {
     return budget - consumed
   }
   
-  const handleSubmit = async (e, skipBudgetCheck = false) => {
+  // Processes an entry in the background - does not block the input UI.
+  // Called without await so the caller returns immediately.
+  const processEntry = async (entryId, description, imageFile, confirmedAnalysis = null) => {
+    try {
+      const formData = new FormData()
+      formData.append('description', description || 'Food from image')
+      if (imageFile) formData.append('image', imageFile)
+      const now = new Date()
+      const localTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      formData.append('local_time', localTime)
+
+      if (!confirmedAnalysis) {
+        formData.append('preview', 'true')
+        const preview = await uploadFile('/meals/analyze', formData)
+
+        if (preview.entry_type === 'meal' && preview.preview) {
+          const mealCalories = preview.meal?.calories || 0
+          const remaining = getCaloriesRemaining()
+
+          if (mealCalories > remaining) {
+            setPendingEntries(prev => prev.map(e =>
+              e.id === entryId ? {
+                ...e,
+                status: 'over_budget',
+                overBudget: {
+                  meal: preview.meal,
+                  calories: mealCalories,
+                  budgetRemaining: Math.max(0, remaining),
+                  imageFile,
+                  description,
+                  confirmedAnalysis: preview.analysis
+                }
+              } : e
+            ))
+            return
+          }
+        }
+        formData.delete('preview')
+      } else {
+        formData.append('confirmed_analysis', JSON.stringify(confirmedAnalysis))
+      }
+
+      const result = await uploadFile('/meals/analyze', formData)
+
+      setPendingEntries(prev => prev.filter(e => e.id !== entryId))
+
+      const entryType = result.entry_type || 'meal'
+
+      if (entryType !== 'question') {
+        setLastEntry({
+          type: entryType,
+          data: result.entry || result.meal,
+          analysis: result.analysis
+        })
+        setTimeout(() => setLastEntry(null), 4000)
+      }
+
+      if (entryType === 'meal' || entryType === 'edit' || entryType === 'merge') {
+        await refresh()
+        fetchWeeklyTrajectory()
+      }
+      await fetchFeed()
+
+      if (isVisible) {
+        setTimeout(() => {
+          const sortOrder = localStorage.getItem('coach_sort_order') || 'asc'
+          window.scrollTo({
+            top: sortOrder === 'desc' ? 0 : document.body.scrollHeight,
+            behavior: 'smooth'
+          })
+        }, 100)
+      }
+    } catch (err) {
+      console.error('Failed to log entry:', err)
+      const message = err?.response?.data?.detail || err?.message || 'Failed to analyze meal. Please try again.'
+      setPendingEntries(prev => prev.map(e =>
+        e.id === entryId ? { ...e, status: 'error', errorMsg: message } : e
+      ))
+    }
+  }
+
+  const handleSubmit = async (e) => {
     e?.preventDefault()
     if (!input.trim() && !image) return
 
-    // Stop the microphone the moment a message is sent.
     if (isRecording) setIsRecording(false)
 
+    const entryId = Date.now()
     const submittedInput = input
     const submittedImage = image
+    const submittedPreview = imagePreview
 
-    // Clear input immediately so the field is ready for the next entry
+    // Clear both text and image immediately so the field is ready for the next entry
     setInput('')
     setInputHeight(58)
     sessionStorage.removeItem('coach_draft')
     sessionStorage.removeItem('coach_draft_height')
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '58px'
-    }
-    
-    try {
-      const formData = new FormData()
-      formData.append('description', submittedInput || 'Food from image')
-      if (submittedImage) {
-        formData.append('image', submittedImage)
-      }
-      // Send user's local time (for meals without explicit time in description)
-      const now = new Date()
-      const localTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-      formData.append('local_time', localTime)
-      
-      // First, preview the meal to check calories (only for potential meal entries)
-      if (!skipBudgetCheck) {
-        formData.append('preview', 'true')
-        const preview = await uploadFile('/meals/analyze', formData)
-        
-        // If it's a meal entry, check if it would exceed budget
-        if (preview.entry_type === 'meal' && preview.preview) {
-          const mealCalories = preview.meal?.calories || 0
-          const remaining = getCaloriesRemaining()
-          
-          if (mealCalories > remaining) {
-            // Show over-budget warning modal
-            setOverBudgetWarning({
-              meal: preview.meal,
-              calories: mealCalories,
-              budgetRemaining: Math.max(0, remaining),
-              savedInput: submittedInput,
-              savedImage: submittedImage,
-              confirmedAnalysis: preview.analysis
-            })
-            return
-          }
-        }
-        
-        // Not a meal or not over budget - continue to actual save
-        formData.delete('preview')
-      }
-      
-      // Actually save the entry
-      const result = await uploadFile('/meals/analyze', formData)
-      
-      // Show feedback based on entry type
-      const entryType = result.entry_type || 'meal'
-      
-      // For questions, we don't show a toast - just refresh feed
-      if (entryType !== 'question') {
-        setLastEntry({
-          type: entryType,
-          data: result.entry || result.meal,
-          analysis: result.analysis
-        })
-        
-        // Auto-hide feedback after 4 seconds
-        setTimeout(() => setLastEntry(null), 4000)
-      }
-      
-      clearImage()
-      
-      // Refresh data
-      if (entryType === 'meal' || entryType === 'edit' || entryType === 'merge') {
-        await refresh()
-        // Also refresh weekly trajectory for updated budget
-        fetchWeeklyTrajectory()
-      }
-      // Always refresh feed to include chat messages
-      await fetchFeed()
-      
-      // Scroll to show the new entry based on sort order
-      setTimeout(() => {
-        const sortOrder = localStorage.getItem('coach_sort_order') || 'asc'
-        window.scrollTo({
-          top: sortOrder === 'desc' ? 0 : document.body.scrollHeight,
-          behavior: 'smooth'
-        })
-      }, 100)
-    } catch (err) {
-      console.error('Failed to log entry:', err)
-      // Extract error message from API response
-      const message = err?.response?.data?.detail || err?.message || 'Failed to analyze meal. Please try again.'
-      setErrorMessage(message)
-      // Auto-hide error after 6 seconds
-      setTimeout(() => setErrorMessage(null), 6000)
-    }
-  }
-  
-  const handleConfirmOverBudget = async () => {
-    if (!overBudgetWarning) return
+    if (textareaRef.current) textareaRef.current.style.height = '58px'
+    clearImage()
 
-    const { savedInput, savedImage, confirmedAnalysis } = overBudgetWarning
-    setOverBudgetWarning(null)
-    
-    // Create new FormData and submit directly, passing the already-analyzed data
-    // to avoid a second AI call that could return different calorie estimates
-    const formData = new FormData()
-    formData.append('description', savedInput || 'Food from image')
-    if (savedImage) {
-      formData.append('image', savedImage)
-    }
-    // Send user's local time
-    const now = new Date()
-    const localTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    formData.append('local_time', localTime)
-    if (confirmedAnalysis) {
-      formData.append('confirmed_analysis', JSON.stringify(confirmedAnalysis))
-    }
-    
-    try {
-      const result = await uploadFile('/meals/analyze', formData)
-      
-      const entryType = result.entry_type || 'meal'
-      
-      if (entryType !== 'question') {
-        setLastEntry({
-          type: entryType,
-          data: result.entry || result.meal,
-          analysis: result.analysis
-        })
-        setTimeout(() => setLastEntry(null), 4000)
-      }
-      
-      clearImage()
-      
-      if (entryType === 'meal' || entryType === 'edit' || entryType === 'merge') {
-        await refresh()
-        fetchWeeklyTrajectory()
-      }
-      await fetchFeed()
-      
-      setTimeout(() => {
-        const sortOrder = localStorage.getItem('coach_sort_order') || 'asc'
-        window.scrollTo({
-          top: sortOrder === 'desc' ? 0 : document.body.scrollHeight,
-          behavior: 'smooth'
-        })
-      }, 100)
-    } catch (err) {
-      console.error('Failed to log entry:', err)
-      const message = err?.response?.data?.detail || err?.message || 'Failed to analyze meal. Please try again.'
-      setErrorMessage(message)
-      setTimeout(() => setErrorMessage(null), 6000)
-    }
+    // Track this request in the pending queue
+    setPendingEntries(prev => [...prev, {
+      id: entryId,
+      text: submittedInput,
+      imagePreview: submittedPreview,
+      status: 'analyzing'
+    }])
+
+    // Fire and forget - input is unblocked immediately
+    processEntry(entryId, submittedInput, submittedImage)
   }
-  
-  const handleCancelOverBudget = () => {
-    // Restore the text so the user can modify and resubmit
-    if (overBudgetWarning?.savedInput) {
-      setInput(overBudgetWarning.savedInput)
-      sessionStorage.setItem('coach_draft', overBudgetWarning.savedInput)
-    }
-    if (overBudgetWarning?.savedImage) {
-      setImage(overBudgetWarning.savedImage)
-    }
-    setOverBudgetWarning(null)
+
+  const handleConfirmOverBudget = (entryId) => {
+    const entry = pendingEntries.find(e => e.id === entryId)
+    if (!entry?.overBudget) return
+
+    setPendingEntries(prev => prev.map(e =>
+      e.id === entryId ? { ...e, status: 'analyzing', overBudget: null } : e
+    ))
+    processEntry(entryId, entry.overBudget.description, entry.overBudget.imageFile, entry.overBudget.confirmedAnalysis)
+  }
+
+  const handleDismissEntry = (entryId) => {
+    setPendingEntries(prev => prev.filter(e => e.id !== entryId))
   }
   
   const handleVoiceResult = (text) => {
@@ -382,7 +336,7 @@ export default function CoachView() {
     return () => el.removeEventListener('touchmove', onTouchMove)
   }, [])
   
-  if (loading && !meals) {
+  if (loading && !meals && isVisible) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-bounce">
@@ -476,8 +430,22 @@ export default function CoachView() {
         </div>
       </div>
       
-      {/* Portal for fixed elements - renders outside SwipeablePages transform */}
-      {createPortal(
+      {/* Always-visible portal: pending entries banner - shows on any page while processing */}
+      {pendingEntries.length > 0 && createPortal(
+        <PendingBanner
+          entries={pendingEntries}
+          onConfirm={handleConfirmOverBudget}
+          onDismiss={handleDismissEntry}
+          bottomOffset={isVisible
+            ? (keyboardHeight > 0 ? `${keyboardHeight + 88}px` : '152px')
+            : '80px'
+          }
+        />,
+        document.body
+      )}
+
+      {/* Conditional portal: input form, toasts, camera - only when Coach is the active page */}
+      {isVisible && createPortal(
         <>
           {/* Entry feedback toast */}
           {lastEntry && (
@@ -562,7 +530,7 @@ export default function CoachView() {
       >
         <form onSubmit={handleSubmit} className="max-w-lg mx-auto">
           {/* ChatGPT-style unified input field */}
-          <div className={`relative w-full border rounded-2xl shadow-lg transition-colors ${submitting ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
+          <div className="relative w-full border rounded-2xl shadow-lg transition-colors bg-white border-gray-200">
             
             {/* Image preview inside input - ChatGPT style */}
             {imagePreview && (
@@ -600,8 +568,7 @@ export default function CoachView() {
               <button
                 type="button"
                 onClick={() => setShowCamera(true)}
-                disabled={submitting}
-                className={`absolute left-3 p-1 transition-colors ${submitting ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
+                className="absolute left-3 p-1 transition-colors text-gray-400 hover:text-gray-600"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -631,7 +598,6 @@ export default function CoachView() {
                 placeholder={imagePreview ? "Ask anything" : "Log or ask anything..."}
                 className="w-full resize-none bg-transparent border-none outline-none text-gray-700 placeholder-gray-400 pl-12 pr-24 scrollbar-hide"
                 style={{ height: `${inputHeight}px`, minHeight: '58px', maxHeight: '120px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingTop: '1rem', paddingBottom: '1rem' }}
-                disabled={submitting}
                 rows={1}
               />
               
@@ -650,19 +616,13 @@ export default function CoachView() {
                 {/* Send button */}
                 <button
                   type="submit"
-                  disabled={submitting || (!input.trim() && !image)}
+                  disabled={!input.trim() && !image}
                   className={`p-1.5 rounded-full transition-colors
-                    ${submitting 
-                      ? 'bg-primary-500 text-white'
-                      : (input.trim() || image)
-                        ? 'bg-primary-500 text-white hover:bg-primary-600' 
-                        : 'text-gray-300'}`}
+                    ${(input.trim() || image)
+                      ? 'bg-primary-500 text-white hover:bg-primary-600'
+                      : 'text-gray-300'}`}
                 >
-                  {submitting ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
+                  <Send className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -678,61 +638,93 @@ export default function CoachView() {
             />
           )}
           
-          {/* Over-budget warning modal */}
-          {overBudgetWarning && (
-            <div 
-              className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4"
-              onClick={handleCancelOverBudget}
-            >
-              <div 
-                className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
-                onClick={e => e.stopPropagation()}
-              >
-                <div className="text-center mb-4">
-                  <div className="text-4xl mb-2">⚠️</div>
-                  <h3 className="text-lg font-semibold text-gray-900">Over Budget</h3>
-                </div>
-                
-                <div className="text-center mb-6">
-                  <p className="text-gray-600 mb-3">
-                    This meal is <span className="font-semibold text-red-600">{Math.round(overBudgetWarning.calories)} cal</span>
-                  </p>
-                  <p className="text-gray-600">
-                    You only have <span className="font-semibold text-gray-900">{Math.round(overBudgetWarning.budgetRemaining)} cal</span> remaining today
-                  </p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Logging this will put you{' '}
-                    <span className="font-medium text-red-600">
-                      {Math.round(overBudgetWarning.calories - overBudgetWarning.budgetRemaining)} cal
-                    </span>{' '}
-                    over budget
-                  </p>
-                </div>
-                
-                <p className="text-center text-gray-700 font-medium mb-4">
-                  Are you sure you want to eat this?
-                </p>
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleCancelOverBudget}
-                    className="flex-1 py-3 px-4 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    No, skip it
-                  </button>
-                  <button
-                    onClick={handleConfirmOverBudget}
-                    className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
-                  >
-                    Yes, log it
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </>,
         document.body
       )}
     </>
+  )
+}
+
+function PendingBanner({ entries, onConfirm, onDismiss, bottomOffset }) {
+  const overBudgetEntry = entries.find(e => e.status === 'over_budget')
+  const errorEntries = entries.filter(e => e.status === 'error')
+  const analyzingEntries = entries.filter(e => e.status === 'analyzing')
+
+  return (
+    <div
+      className="fixed left-4 right-4 max-w-lg mx-auto z-50 space-y-2 pointer-events-none transition-[bottom] duration-150"
+      style={{ bottom: bottomOffset }}
+    >
+      {/* Error cards */}
+      {errorEntries.map(entry => (
+        <div key={entry.id} className="pointer-events-auto bg-red-50 border border-red-200 rounded-2xl p-3 flex items-start gap-3 shadow-md">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-800">Analysis failed</p>
+            <p className="text-xs text-red-600 mt-0.5 line-clamp-2">{entry.errorMsg}</p>
+          </div>
+          <button onClick={() => onDismiss(entry.id)} className="text-red-400 hover:text-red-600 p-0.5 flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+
+      {/* Over-budget confirmation card */}
+      {overBudgetEntry && (
+        <div className="pointer-events-auto bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-md">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="text-xl leading-none">⚠️</div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-900">Over your calorie budget</p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                This meal is{' '}
+                <span className="font-semibold text-red-600">{Math.round(overBudgetEntry.overBudget.calories)} cal</span>
+                {' '}but you only have{' '}
+                <span className="font-semibold">{Math.round(overBudgetEntry.overBudget.budgetRemaining)} cal</span> remaining
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onDismiss(overBudgetEntry.id)}
+              className="flex-1 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            >
+              Skip it
+            </button>
+            <button
+              onClick={() => onConfirm(overBudgetEntry.id)}
+              className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors"
+            >
+              Log anyway
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Analyzing indicator */}
+      {analyzingEntries.length > 0 && (
+        <div className="pointer-events-auto bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-md flex items-center gap-3">
+          {analyzingEntries[analyzingEntries.length - 1].imagePreview ? (
+            <img
+              src={analyzingEntries[analyzingEntries.length - 1].imagePreview}
+              className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+              alt=""
+            />
+          ) : (
+            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-primary-500" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            {analyzingEntries[analyzingEntries.length - 1].text && (
+              <p className="text-sm text-gray-700 truncate">{analyzingEntries[analyzingEntries.length - 1].text}</p>
+            )}
+            <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+              <span className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin inline-block flex-shrink-0" />
+              AI is analyzing{analyzingEntries.length > 1 ? ` · ${analyzingEntries.length} entries` : '...'}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

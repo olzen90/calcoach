@@ -28,12 +28,14 @@ function AppContent() {
     <div className="min-h-screen">
       <main className="pb-20">
         {/*
-          CoachView mounts/unmounts normally because it renders portals into
-          document.body (floating input bar, toasts). Keeping it mounted while
-          hidden would render those elements over other pages.
-          The JS cache means remounting it is essentially instant.
+          CoachView is kept mounted so background AI requests continue even
+          when the user navigates to Stats/Progress/Settings. It reads the
+          current route via useLocation() internally and only renders its
+          fixed portal elements (input bar, toasts) when it is the active page.
         */}
-        {pathname === '/' && <CoachView />}
+        <div style={pathname !== '/' ? { display: 'none' } : undefined}>
+          <CoachView />
+        </div>
 
         {/*
           Stats, Progress and Settings are kept permanently mounted once the
