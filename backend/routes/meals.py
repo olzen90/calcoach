@@ -23,6 +23,14 @@ class MealCreate(BaseModel):
     sugar_g: Optional[int] = None
     fiber_g: Optional[int] = None
     sodium_mg: Optional[int] = None
+    vitamin_a_mcg: Optional[float] = None
+    vitamin_c_mg: Optional[float] = None
+    vitamin_d_mcg: Optional[float] = None
+    vitamin_b12_mcg: Optional[float] = None
+    iron_mg: Optional[float] = None
+    calcium_mg: Optional[float] = None
+    potassium_mg: Optional[float] = None
+    magnesium_mg: Optional[float] = None
 
 
 class MealUpdate(BaseModel):
@@ -726,7 +734,15 @@ async def log_quick_meal(meal_data: MealCreate, db: Session = Depends(get_db)):
         fat_g=meal_data.fat_g or 0,
         sugar_g=meal_data.sugar_g or 0,
         fiber_g=meal_data.fiber_g or 0,
-        sodium_mg=meal_data.sodium_mg or 0
+        sodium_mg=meal_data.sodium_mg or 0,
+        vitamin_a_mcg=meal_data.vitamin_a_mcg or 0,
+        vitamin_c_mg=meal_data.vitamin_c_mg or 0,
+        vitamin_d_mcg=meal_data.vitamin_d_mcg or 0,
+        vitamin_b12_mcg=meal_data.vitamin_b12_mcg or 0,
+        iron_mg=meal_data.iron_mg or 0,
+        calcium_mg=meal_data.calcium_mg or 0,
+        potassium_mg=meal_data.potassium_mg or 0,
+        magnesium_mg=meal_data.magnesium_mg or 0,
     )
     
     db.add(meal)
@@ -955,6 +971,14 @@ async def auto_log_favorites(db: Session = Depends(get_db)):
             sugar_g=template.sugar_g or 0,
             fiber_g=template.fiber_g or 0,
             sodium_mg=template.sodium_mg or 0,
+            vitamin_a_mcg=template.vitamin_a_mcg or 0,
+            vitamin_c_mg=template.vitamin_c_mg or 0,
+            vitamin_d_mcg=template.vitamin_d_mcg or 0,
+            vitamin_b12_mcg=template.vitamin_b12_mcg or 0,
+            iron_mg=template.iron_mg or 0,
+            calcium_mg=template.calcium_mg or 0,
+            potassium_mg=template.potassium_mg or 0,
+            magnesium_mg=template.magnesium_mg or 0,
             emoji=template.emoji or "🔄",
             ai_response=f"Auto-logged from saved favorite: {template.name}",
             breakdown=template.breakdown

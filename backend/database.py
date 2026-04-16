@@ -104,6 +104,15 @@ class MealTemplate(Base):
     sugar_g = Column(Integer, default=0)
     fiber_g = Column(Integer, default=0)
     sodium_mg = Column(Integer, default=0)
+    # Vitamins & minerals
+    vitamin_a_mcg = Column(Float, default=0)
+    vitamin_c_mg = Column(Float, default=0)
+    vitamin_d_mcg = Column(Float, default=0)
+    vitamin_b12_mcg = Column(Float, default=0)
+    iron_mg = Column(Float, default=0)
+    calcium_mg = Column(Float, default=0)
+    potassium_mg = Column(Float, default=0)
+    magnesium_mg = Column(Float, default=0)
     breakdown = Column(Text)  # JSON string with ingredient breakdown
     emoji = Column(String(10))
     use_count = Column(Integer, default=0)
@@ -334,6 +343,21 @@ def run_migrations():
             if 'emoji' not in columns:
                 conn.execute(text('ALTER TABLE meal_templates ADD COLUMN emoji VARCHAR(10)'))
                 conn.commit()
+
+            template_vitamin_cols = [
+                ('vitamin_a_mcg', 'FLOAT DEFAULT 0'),
+                ('vitamin_c_mg', 'FLOAT DEFAULT 0'),
+                ('vitamin_d_mcg', 'FLOAT DEFAULT 0'),
+                ('vitamin_b12_mcg', 'FLOAT DEFAULT 0'),
+                ('iron_mg', 'FLOAT DEFAULT 0'),
+                ('calcium_mg', 'FLOAT DEFAULT 0'),
+                ('potassium_mg', 'FLOAT DEFAULT 0'),
+                ('magnesium_mg', 'FLOAT DEFAULT 0'),
+            ]
+            for col_name, col_def in template_vitamin_cols:
+                if col_name not in columns:
+                    conn.execute(text(f'ALTER TABLE meal_templates ADD COLUMN {col_name} {col_def}'))
+                    conn.commit()
 
         # Check meal_entries table for vitamin columns
         if 'meal_entries' in inspector.get_table_names():

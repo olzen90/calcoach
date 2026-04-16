@@ -199,6 +199,14 @@ export default function CoachChat({ feed, meals, onRefresh }) {
           sugar_g: meal.sugar_g || 0,
           fiber_g: meal.fiber_g || 0,
           sodium_mg: meal.sodium_mg || 0,
+          vitamin_a_mcg: meal.vitamin_a_mcg || 0,
+          vitamin_c_mg: meal.vitamin_c_mg || 0,
+          vitamin_d_mcg: meal.vitamin_d_mcg || 0,
+          vitamin_b12_mcg: meal.vitamin_b12_mcg || 0,
+          iron_mg: meal.iron_mg || 0,
+          calcium_mg: meal.calcium_mg || 0,
+          potassium_mg: meal.potassium_mg || 0,
+          magnesium_mg: meal.magnesium_mg || 0,
           breakdown: meal.breakdown || null,
           emoji: meal.emoji || null
         })
