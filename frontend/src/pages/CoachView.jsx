@@ -175,6 +175,9 @@ export default function CoachView() {
     e?.preventDefault()
     if (!input.trim() && !image) return
 
+    // Stop the microphone the moment a message is sent.
+    if (isRecording) setIsRecording(false)
+
     const submittedInput = input
     const submittedImage = image
 

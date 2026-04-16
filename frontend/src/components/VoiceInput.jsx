@@ -130,6 +130,39 @@ const VoiceInput = forwardRef(function VoiceInput({ onResult, onSendCommand, isR
     }
   }, [language]) // Re-create recognition when language changes
   
+  // Stop recognition whenever the parent sets isRecording → false externally
+  // (e.g. when the form is submitted or the component unmounts).
+  useEffect(() => {
+    if (!isRecording) {
+      shouldRestartRef.current = false
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop() } catch (_) {}
+      }
+    }
+  }, [isRecording])
+
+  // Stop when the page loses focus or becomes hidden (app switch, tab change).
+  useEffect(() => {
+    const stop = () => {
+      if (isRecordingRef.current) {
+        shouldRestartRef.current = false
+        setIsRecordingRef.current(false)
+        if (recognitionRef.current) {
+          try { recognitionRef.current.stop() } catch (_) {}
+        }
+      }
+    }
+
+    const onVisibility = () => { if (document.hidden) stop() }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('blur', stop)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('blur', stop)
+    }
+  }, [])
+
   const toggleRecording = useCallback(async () => {
     if (!recognitionRef.current) {
       alert('Talegenkendelse understøttes ikke i din browser. Brug Chrome for stemmeinput.')
