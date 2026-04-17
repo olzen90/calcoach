@@ -1,5 +1,5 @@
-const CACHE_NAME = 'calcoach-v2';
-const API_CACHE_NAME = 'calcoach-api-v1';
+const CACHE_NAME = 'calcoach-v3';
+const API_CACHE_NAME = 'calcoach-api-v2';
 
 // Static assets pre-cached on install
 const STATIC_URLS = [
@@ -10,9 +10,12 @@ const STATIC_URLS = [
   '/icons/icon-512.png',
 ];
 
-// API paths whose responses are worth caching between sessions.
-// Meals are deliberately excluded — showing yesterday's log as "today" would be confusing.
+// API paths whose responses are cached between sessions using stale-while-revalidate.
+// The JS layer clears this cache on any mutation so stale data is never shown after a write.
+// coach-init is included: showing the previous session's meal log for a fraction of a second
+// while the serverless function cold-starts is far better than a 5+ second blank screen.
 const CACHEABLE_API_PREFIXES = [
+  '/api/meals/coach-init',
   '/api/stats/',
   '/api/progress/',
   '/api/settings/',
@@ -37,6 +40,18 @@ self.addEventListener('activate', (event) => {
     ).then(() => self.clients.claim())
   );
 });
+
+// Keep-warm: ping a lightweight endpoint every 8 minutes so the Python serverless
+// function never goes cold (Vercel shuts it down after ~15 min of inactivity).
+// The /api/settings/ call is cheap (no AI, no heavy computation).
+const WARM_INTERVAL_MS = 8 * 60 * 1000;
+function scheduleWarmPing() {
+  setTimeout(async () => {
+    try { await fetch('/api/settings/'); } catch (_) {}
+    scheduleWarmPing();
+  }, WARM_INTERVAL_MS);
+}
+scheduleWarmPing();
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;

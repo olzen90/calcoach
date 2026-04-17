@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 
 const API_BASE = '/api'
-const SW_API_CACHE = 'calcoach-api-v1'
+const SW_API_CACHE = 'calcoach-api-v2'
 
 // Module-level cache — survives component unmount/remount (page navigation).
 // Invalidated on any successful mutation so data stays accurate after writes.
